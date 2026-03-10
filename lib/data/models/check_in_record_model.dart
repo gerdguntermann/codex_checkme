@@ -34,7 +34,7 @@ class CheckInRecordModel {
   static DateTime _dateTimeFromTimestamp(dynamic value) {
     if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     if (value is String) return DateTime.parse(value);
-    return DateTime.now();
+    throw ArgumentError('Cannot convert $value (${value.runtimeType}) to DateTime');
   }
 
   static int _dateTimeToTimestamp(DateTime dt) => dt.millisecondsSinceEpoch;

@@ -8,7 +8,7 @@ part of 'check_in_config_model.dart';
 
 CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
     CheckInConfigModel(
-      intervalHours: (json['intervalHours'] as num).toInt(),
+      intervalMinutes: (json['intervalMinutes'] as num).toInt(),
       timeWindowStartHour: (json['timeWindowStartHour'] as num).toInt(),
       timeWindowStartMinute: (json['timeWindowStartMinute'] as num).toInt(),
       timeWindowEndHour: (json['timeWindowEndHour'] as num).toInt(),
@@ -20,7 +20,7 @@ CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$CheckInConfigModelToJson(CheckInConfigModel instance) =>
     <String, dynamic>{
-      'intervalHours': instance.intervalHours,
+      'intervalMinutes': instance.intervalMinutes,
       'timeWindowStartHour': instance.timeWindowStartHour,
       'timeWindowStartMinute': instance.timeWindowStartMinute,
       'timeWindowEndHour': instance.timeWindowEndHour,

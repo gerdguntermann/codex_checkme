@@ -22,7 +22,7 @@ void callbackDispatcher() {
       final localDs = ConfigLocalDatasourceImpl(prefs);
       final remoteConfigDs = ConfigRemoteDatasourceImpl(firestore);
 
-      final userId = prefs.getString('user_id');
+      final userId = prefs.getString(AppConstants.userIdKey);
       if (userId == null) return true;
 
       final configModel = await () async {

@@ -5,7 +5,7 @@ part 'check_in_config_model.g.dart';
 
 @JsonSerializable()
 class CheckInConfigModel {
-  final int intervalHours;
+  final int intervalMinutes;
   final int timeWindowStartHour;
   final int timeWindowStartMinute;
   final int timeWindowEndHour;
@@ -15,7 +15,7 @@ class CheckInConfigModel {
   final bool isActive;
 
   const CheckInConfigModel({
-    required this.intervalHours,
+    required this.intervalMinutes,
     required this.timeWindowStartHour,
     required this.timeWindowStartMinute,
     required this.timeWindowEndHour,
@@ -32,7 +32,7 @@ class CheckInConfigModel {
 
   factory CheckInConfigModel.fromDomain(CheckInConfig config) =>
       CheckInConfigModel(
-        intervalHours: config.intervalHours,
+        intervalMinutes: config.intervalMinutes,
         timeWindowStartHour: config.timeWindowStartHour,
         timeWindowStartMinute: config.timeWindowStartMinute,
         timeWindowEndHour: config.timeWindowEndHour,
@@ -43,7 +43,7 @@ class CheckInConfigModel {
       );
 
   CheckInConfig toDomain() => CheckInConfig(
-        intervalHours: intervalHours,
+        intervalMinutes: intervalMinutes,
         timeWindowStartHour: timeWindowStartHour,
         timeWindowStartMinute: timeWindowStartMinute,
         timeWindowEndHour: timeWindowEndHour,

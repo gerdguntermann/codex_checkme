@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 class CheckInConfig extends Equatable {
-  final int intervalHours;
+  final int intervalMinutes;
   final int timeWindowStartHour;
   final int timeWindowStartMinute;
   final int timeWindowEndHour;
@@ -11,7 +11,7 @@ class CheckInConfig extends Equatable {
   final bool isActive;
 
   const CheckInConfig({
-    required this.intervalHours,
+    required this.intervalMinutes,
     required this.timeWindowStartHour,
     required this.timeWindowStartMinute,
     required this.timeWindowEndHour,
@@ -22,7 +22,7 @@ class CheckInConfig extends Equatable {
   });
 
   factory CheckInConfig.defaults() => const CheckInConfig(
-        intervalHours: 12,
+        intervalMinutes: 720,
         timeWindowStartHour: 8,
         timeWindowStartMinute: 0,
         timeWindowEndHour: 22,
@@ -33,7 +33,7 @@ class CheckInConfig extends Equatable {
       );
 
   CheckInConfig copyWith({
-    int? intervalHours,
+    int? intervalMinutes,
     int? timeWindowStartHour,
     int? timeWindowStartMinute,
     int? timeWindowEndHour,
@@ -43,7 +43,7 @@ class CheckInConfig extends Equatable {
     bool? isActive,
   }) {
     return CheckInConfig(
-      intervalHours: intervalHours ?? this.intervalHours,
+      intervalMinutes: intervalMinutes ?? this.intervalMinutes,
       timeWindowStartHour: timeWindowStartHour ?? this.timeWindowStartHour,
       timeWindowStartMinute: timeWindowStartMinute ?? this.timeWindowStartMinute,
       timeWindowEndHour: timeWindowEndHour ?? this.timeWindowEndHour,
@@ -56,7 +56,7 @@ class CheckInConfig extends Equatable {
 
   @override
   List<Object?> get props => [
-        intervalHours,
+        intervalMinutes,
         timeWindowStartHour,
         timeWindowStartMinute,
         timeWindowEndHour,

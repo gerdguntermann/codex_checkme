@@ -14,7 +14,7 @@ class TimeUtils {
   static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) {
     if (lastCheckIn == null) return false;
     final deadline = lastCheckIn
-        .add(Duration(hours: config.intervalHours))
+        .add(Duration(minutes: config.intervalMinutes))
         .add(Duration(minutes: config.gracePeriodMinutes));
     return DateTime.now().isAfter(deadline);
   }
@@ -22,7 +22,7 @@ class TimeUtils {
   /// Returns the deadline DateTime for the next check-in.
   static DateTime nextDeadline(DateTime lastCheckIn, CheckInConfig config) {
     return lastCheckIn
-        .add(Duration(hours: config.intervalHours))
+        .add(Duration(minutes: config.intervalMinutes))
         .add(Duration(minutes: config.gracePeriodMinutes));
   }
 

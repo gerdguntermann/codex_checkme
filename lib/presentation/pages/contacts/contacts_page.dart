@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/contact_provider.dart';
+import '../../../domain/entities/contact.dart';
 import 'widgets/contact_list_tile.dart';
 import 'widgets/contact_form_dialog.dart';
 
 class ContactsPage extends ConsumerWidget {
   const ContactsPage({super.key});
 
-  Future<void> _showContactForm(BuildContext context, WidgetRef ref, {contact}) async {
+  Future<void> _showContactForm(BuildContext context, WidgetRef ref, {Contact? contact}) async {
     final result = await showDialog(
       context: context,
       builder: (ctx) => ContactFormDialog(contact: contact),

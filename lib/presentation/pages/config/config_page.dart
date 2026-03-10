@@ -17,17 +17,6 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
   CheckInConfig? _editingConfig;
   bool _saving = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final config = ref.read(configNotifierProvider).valueOrNull;
-      if (config != null) {
-        setState(() => _editingConfig = config);
-      }
-    });
-  }
-
   Future<void> _save() async {
     if (_editingConfig == null) return;
     setState(() => _saving = true);
@@ -87,12 +76,12 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
                       children: [
                         IntervalSlider(
                           label: 'Check-in Interval',
-                          value: editing.intervalHours,
-                          min: 1,
-                          max: 48,
-                          unit: 'hours',
+                          value: editing.intervalMinutes,
+                          min: 10,
+                          max: 2880,
+                          unit: 'min',
                           onChanged: (v) => setState(() =>
-                              _editingConfig = editing.copyWith(intervalHours: v)),
+                              _editingConfig = editing.copyWith(intervalMinutes: v)),
                         ),
                         const Divider(),
                         IntervalSlider(

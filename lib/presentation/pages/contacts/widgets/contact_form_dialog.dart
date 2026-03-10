@@ -57,7 +57,8 @@ class _ContactFormDialogState extends State<ContactFormDialog> {
               keyboardType: TextInputType.emailAddress,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Email required';
-                if (!v.contains('@')) return 'Invalid email';
+                final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                if (!emailRegex.hasMatch(v.trim())) return 'Invalid email';
                 return null;
               },
             ),

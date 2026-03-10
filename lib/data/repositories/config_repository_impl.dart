@@ -28,16 +28,7 @@ class ConfigRepositoryImpl implements ConfigRepository {
         return Right(cached.toDomain());
       } on CacheException {
         // Return defaults if nothing cached
-        return const Right(CheckInConfig(
-          intervalHours: 12,
-          timeWindowStartHour: 8,
-          timeWindowStartMinute: 0,
-          timeWindowEndHour: 22,
-          timeWindowEndMinute: 0,
-          gracePeriodMinutes: 30,
-          maxNotifications: 3,
-          isActive: true,
-        ));
+        return Right(CheckInConfig.defaults());
       }
     }
   }
