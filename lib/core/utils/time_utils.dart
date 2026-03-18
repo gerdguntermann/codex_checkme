@@ -1,32 +1,61 @@
 import '../../domain/entities/check_in_config.dart';
 
+enum CheckInState { ok, grace, overdue }
+
 class TimeUtils {
-  /// Returns true if the current time is within the configured time window.
-  static bool isWithinWindow(CheckInConfig config) {
+  static DateTime previousFixedDeadline(CheckInConfig config) {
     final now = DateTime.now();
-    final startMinutes = config.timeWindowStartHour * 60 + config.timeWindowStartMinute;
-    final endMinutes = config.timeWindowEndHour * 60 + config.timeWindowEndMinute;
-    final nowMinutes = now.hour * 60 + now.minute;
-    return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    final todayDeadline = DateTime(
+        now.year, now.month, now.day, config.checkInHour, config.checkInMinute);
+    return now.isAfter(todayDeadline)
+        ? todayDeadline
+        : todayDeadline.subtract(const Duration(days: 1));
   }
 
-  /// Returns true if the last check-in is overdue (past interval + grace period).
-  static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) {
-    if (lastCheckIn == null) return false;
-    final deadline = lastCheckIn
-        .add(Duration(minutes: config.intervalMinutes))
-        .add(Duration(minutes: config.gracePeriodMinutes));
-    return DateTime.now().isAfter(deadline);
-  }
-
-  /// Returns the deadline DateTime for the next check-in.
+  /// The next deadline: for fixedTime mode the next daily occurrence,
+  /// for interval mode lastCheckIn + intervalMinutes.
   static DateTime nextDeadline(DateTime lastCheckIn, CheckInConfig config) {
-    return lastCheckIn
-        .add(Duration(minutes: config.intervalMinutes))
-        .add(Duration(minutes: config.gracePeriodMinutes));
+    if (config.timingMode == TimingMode.interval) {
+      return lastCheckIn.add(Duration(minutes: config.intervalMinutes));
+    }
+    final now = DateTime.now();
+    final todayDeadline = DateTime(
+        now.year, now.month, now.day, config.checkInHour, config.checkInMinute);
+    return now.isBefore(todayDeadline)
+        ? todayDeadline
+        : todayDeadline.add(const Duration(days: 1));
   }
 
-  /// Returns duration remaining until deadline, or Duration.zero if already overdue.
+  /// Returns the current check-in state based on deadline and grace period.
+  static CheckInState getState(DateTime? lastCheckIn, CheckInConfig config) {
+    if (lastCheckIn == null) return CheckInState.ok;
+    final now = DateTime.now();
+
+    if (config.timingMode == TimingMode.interval) {
+      final deadline =
+          lastCheckIn.add(Duration(minutes: config.intervalMinutes));
+      if (now.isAfter(
+          deadline.add(Duration(minutes: config.gracePeriodMinutes)))) {
+        return CheckInState.overdue;
+      }
+      if (now.isAfter(deadline)) return CheckInState.grace;
+      return CheckInState.ok;
+    }
+
+    // fixedTime
+    final prev = previousFixedDeadline(config);
+    if (lastCheckIn.isAfter(prev)) return CheckInState.ok;
+    if (now.isAfter(prev.add(Duration(minutes: config.gracePeriodMinutes)))) {
+      return CheckInState.overdue;
+    }
+    if (now.isAfter(prev)) return CheckInState.grace;
+    return CheckInState.ok;
+  }
+
+  static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) =>
+      getState(lastCheckIn, config) == CheckInState.overdue;
+
+  /// Returns duration remaining until the next deadline, or Duration.zero if past.
   static Duration timeUntilDeadline(DateTime lastCheckIn, CheckInConfig config) {
     final deadline = nextDeadline(lastCheckIn, config);
     final remaining = deadline.difference(DateTime.now());

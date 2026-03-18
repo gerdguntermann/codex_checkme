@@ -1,31 +1,59 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:checkme/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../../providers/check_in_provider.dart';
 import '../../../providers/config_provider.dart';
 import '../../../../core/utils/time_utils.dart';
+import '../../../../domain/entities/check_in_config.dart';
 
-class StatusIndicator extends ConsumerWidget {
+class StatusIndicator extends ConsumerStatefulWidget {
   const StatusIndicator({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StatusIndicator> createState() => _StatusIndicatorState();
+}
+
+class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild every 30 s so grace/overdue transitions appear without interaction.
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final checkInState = ref.watch(checkInNotifierProvider);
     final configState = ref.watch(configNotifierProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: checkInState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Text('Error: $err', style: const TextStyle(color: Colors.red)),
+          error: (err, _) => Text(l10n.genericError(err.toString()),
+              style: const TextStyle(color: Colors.red)),
           data: (lastCheckIn) {
             if (lastCheckIn == null) {
-              return const _StatusRow(
+              return _StatusRow(
                 icon: Icons.info_outline,
                 color: Colors.grey,
-                label: 'No check-ins yet',
-                value: 'Press the button to start',
+                label: l10n.noCheckInsYet,
+                value: l10n.pressButtonToStart,
               );
             }
 
@@ -34,34 +62,57 @@ class StatusIndicator extends ConsumerWidget {
             final timeStr = formatter.format(lastCheckIn.timestamp);
 
             if (config != null) {
-              final overdue = TimeUtils.isOverdue(lastCheckIn.timestamp, config);
-              final remaining = TimeUtils.timeUntilDeadline(lastCheckIn.timestamp, config);
-              final hours = remaining.inHours;
-              final minutes = remaining.inMinutes % 60;
+              final state =
+                  TimeUtils.getState(lastCheckIn.timestamp, config);
+              final deadline =
+                  TimeUtils.nextDeadline(lastCheckIn.timestamp, config);
+              final deadlineStr = _formatDeadline(deadline, config, l10n);
+
+              final (icon, color, statusLabel, statusValue) = switch (state) {
+                CheckInState.ok => (
+                    Icons.check_circle,
+                    Colors.green,
+                    l10n.statusOk,
+                    l10n.allGood,
+                  ),
+                CheckInState.grace => (
+                    Icons.warning_amber,
+                    Colors.orange,
+                    l10n.statusGrace,
+                    l10n.graceMessage,
+                  ),
+                CheckInState.overdue => (
+                    Icons.warning,
+                    Colors.red,
+                    l10n.statusOverdue,
+                    l10n.checkInRequired,
+                  ),
+              };
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _StatusRow(
-                    icon: overdue ? Icons.warning : Icons.check_circle,
-                    color: overdue ? Colors.red : Colors.green,
-                    label: overdue ? 'OVERDUE' : 'OK',
-                    value: overdue ? 'Check-in required!' : 'All good',
+                    icon: icon,
+                    color: color,
+                    label: statusLabel,
+                    value: statusValue,
                   ),
                   const Divider(),
                   _StatusRow(
                     icon: Icons.access_time,
                     color: Colors.blue,
-                    label: 'Last check-in',
+                    label: l10n.lastCheckIn,
                     value: timeStr,
                   ),
-                  if (!overdue)
-                    _StatusRow(
-                      icon: Icons.timer_outlined,
-                      color: Colors.orange,
-                      label: 'Next deadline in',
-                      value: '${hours}h ${minutes}m',
-                    ),
+                  _StatusRow(
+                    icon: Icons.timer_outlined,
+                    color: state == CheckInState.ok
+                        ? Colors.orange
+                        : color,
+                    label: l10n.nextDeadline,
+                    value: deadlineStr,
+                  ),
                 ],
               );
             }
@@ -69,7 +120,7 @@ class StatusIndicator extends ConsumerWidget {
             return _StatusRow(
               icon: Icons.check_circle,
               color: Colors.green,
-              label: 'Last check-in',
+              label: l10n.lastCheckIn,
               value: timeStr,
             );
           },
@@ -77,6 +128,17 @@ class StatusIndicator extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatDeadline(
+    DateTime deadline, CheckInConfig config, AppLocalizations l10n) {
+  if (config.timingMode == TimingMode.interval) {
+    return DateFormat('dd.MM.yyyy HH:mm').format(deadline);
+  }
+  final isToday = deadline.day == DateTime.now().day;
+  return isToday
+      ? DateFormat('HH:mm').format(deadline)
+      : '${l10n.tomorrow} ${DateFormat('HH:mm').format(deadline)}';
 }
 
 class _StatusRow extends StatelessWidget {

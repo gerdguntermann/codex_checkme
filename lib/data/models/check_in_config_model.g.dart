@@ -8,11 +8,10 @@ part of 'check_in_config_model.dart';
 
 CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
     CheckInConfigModel(
-      intervalMinutes: (json['intervalMinutes'] as num).toInt(),
-      timeWindowStartHour: (json['timeWindowStartHour'] as num).toInt(),
-      timeWindowStartMinute: (json['timeWindowStartMinute'] as num).toInt(),
-      timeWindowEndHour: (json['timeWindowEndHour'] as num).toInt(),
-      timeWindowEndMinute: (json['timeWindowEndMinute'] as num).toInt(),
+      timingMode: json['timingMode'] as String? ?? 'fixedTime',
+      checkInHour: (json['checkInHour'] as num?)?.toInt() ?? 9,
+      checkInMinute: (json['checkInMinute'] as num?)?.toInt() ?? 0,
+      intervalMinutes: (json['intervalMinutes'] as num?)?.toInt() ?? 240,
       gracePeriodMinutes: (json['gracePeriodMinutes'] as num).toInt(),
       maxNotifications: (json['maxNotifications'] as num).toInt(),
       isActive: json['isActive'] as bool,
@@ -20,11 +19,10 @@ CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$CheckInConfigModelToJson(CheckInConfigModel instance) =>
     <String, dynamic>{
+      'timingMode': instance.timingMode,
+      'checkInHour': instance.checkInHour,
+      'checkInMinute': instance.checkInMinute,
       'intervalMinutes': instance.intervalMinutes,
-      'timeWindowStartHour': instance.timeWindowStartHour,
-      'timeWindowStartMinute': instance.timeWindowStartMinute,
-      'timeWindowEndHour': instance.timeWindowEndHour,
-      'timeWindowEndMinute': instance.timeWindowEndMinute,
       'gracePeriodMinutes': instance.gracePeriodMinutes,
       'maxNotifications': instance.maxNotifications,
       'isActive': instance.isActive,

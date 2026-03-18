@@ -5,21 +5,23 @@ part 'check_in_config_model.g.dart';
 
 @JsonSerializable()
 class CheckInConfigModel {
+  @JsonKey(defaultValue: 'fixedTime')
+  final String timingMode;
+  @JsonKey(defaultValue: 9)
+  final int checkInHour;
+  @JsonKey(defaultValue: 0)
+  final int checkInMinute;
+  @JsonKey(defaultValue: 240)
   final int intervalMinutes;
-  final int timeWindowStartHour;
-  final int timeWindowStartMinute;
-  final int timeWindowEndHour;
-  final int timeWindowEndMinute;
   final int gracePeriodMinutes;
   final int maxNotifications;
   final bool isActive;
 
   const CheckInConfigModel({
+    required this.timingMode,
+    required this.checkInHour,
+    required this.checkInMinute,
     required this.intervalMinutes,
-    required this.timeWindowStartHour,
-    required this.timeWindowStartMinute,
-    required this.timeWindowEndHour,
-    required this.timeWindowEndMinute,
     required this.gracePeriodMinutes,
     required this.maxNotifications,
     required this.isActive,
@@ -32,22 +34,23 @@ class CheckInConfigModel {
 
   factory CheckInConfigModel.fromDomain(CheckInConfig config) =>
       CheckInConfigModel(
+        timingMode: config.timingMode.name,
+        checkInHour: config.checkInHour,
+        checkInMinute: config.checkInMinute,
         intervalMinutes: config.intervalMinutes,
-        timeWindowStartHour: config.timeWindowStartHour,
-        timeWindowStartMinute: config.timeWindowStartMinute,
-        timeWindowEndHour: config.timeWindowEndHour,
-        timeWindowEndMinute: config.timeWindowEndMinute,
         gracePeriodMinutes: config.gracePeriodMinutes,
         maxNotifications: config.maxNotifications,
         isActive: config.isActive,
       );
 
   CheckInConfig toDomain() => CheckInConfig(
+        timingMode: TimingMode.values.firstWhere(
+          (e) => e.name == timingMode,
+          orElse: () => TimingMode.fixedTime,
+        ),
+        checkInHour: checkInHour,
+        checkInMinute: checkInMinute,
         intervalMinutes: intervalMinutes,
-        timeWindowStartHour: timeWindowStartHour,
-        timeWindowStartMinute: timeWindowStartMinute,
-        timeWindowEndHour: timeWindowEndHour,
-        timeWindowEndMinute: timeWindowEndMinute,
         gracePeriodMinutes: gracePeriodMinutes,
         maxNotifications: maxNotifications,
         isActive: isActive,

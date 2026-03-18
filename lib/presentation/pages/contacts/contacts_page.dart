@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:checkme/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/contact_provider.dart';
 import '../../../domain/entities/contact.dart';
@@ -25,10 +26,11 @@ class ContactsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final contactsState = ref.watch(contactsNotifierProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Contacts'),
+        title: Text(l10n.contactsTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
@@ -40,17 +42,17 @@ class ContactsPage extends ConsumerWidget {
       ),
       body: contactsState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(child: Text(l10n.genericError(err.toString()))),
         data: (contacts) {
           if (contacts.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('No contacts yet'),
-                  Text('Tap + to add a contact'),
+                  const Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(l10n.noContactsYet),
+                  Text(l10n.tapToAddContact),
                 ],
               ),
             );

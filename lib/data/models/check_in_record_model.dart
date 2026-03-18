@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/check_in_record.dart';
 
@@ -7,7 +8,7 @@ part 'check_in_record_model.g.dart';
 class CheckInRecordModel {
   final String id;
   final String userId;
-  @JsonKey(fromJson: _dateTimeFromTimestamp, toJson: _dateTimeToTimestamp)
+  @JsonKey(fromJson: _dateTimeFromTimestamp)
   final DateTime timestamp;
 
   const CheckInRecordModel({
@@ -32,10 +33,8 @@ class CheckInRecordModel {
       );
 
   static DateTime _dateTimeFromTimestamp(dynamic value) {
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    if (value is String) return DateTime.parse(value);
+    if (value is Timestamp) return value.toDate();
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value); // migration: alte int-Werte
     throw ArgumentError('Cannot convert $value (${value.runtimeType}) to DateTime');
   }
-
-  static int _dateTimeToTimestamp(DateTime dt) => dt.millisecondsSinceEpoch;
 }

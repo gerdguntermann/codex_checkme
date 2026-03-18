@@ -1,53 +1,50 @@
 import 'package:equatable/equatable.dart';
 
+enum TimingMode { fixedTime, interval }
+
 class CheckInConfig extends Equatable {
+  final TimingMode timingMode;
+  final int checkInHour;
+  final int checkInMinute;
   final int intervalMinutes;
-  final int timeWindowStartHour;
-  final int timeWindowStartMinute;
-  final int timeWindowEndHour;
-  final int timeWindowEndMinute;
   final int gracePeriodMinutes;
   final int maxNotifications;
   final bool isActive;
 
   const CheckInConfig({
+    required this.timingMode,
+    required this.checkInHour,
+    required this.checkInMinute,
     required this.intervalMinutes,
-    required this.timeWindowStartHour,
-    required this.timeWindowStartMinute,
-    required this.timeWindowEndHour,
-    required this.timeWindowEndMinute,
     required this.gracePeriodMinutes,
     required this.maxNotifications,
     required this.isActive,
   });
 
   factory CheckInConfig.defaults() => const CheckInConfig(
-        intervalMinutes: 720,
-        timeWindowStartHour: 8,
-        timeWindowStartMinute: 0,
-        timeWindowEndHour: 22,
-        timeWindowEndMinute: 0,
+        timingMode: TimingMode.fixedTime,
+        checkInHour: 9,
+        checkInMinute: 0,
+        intervalMinutes: 240,
         gracePeriodMinutes: 30,
         maxNotifications: 3,
         isActive: true,
       );
 
   CheckInConfig copyWith({
+    TimingMode? timingMode,
+    int? checkInHour,
+    int? checkInMinute,
     int? intervalMinutes,
-    int? timeWindowStartHour,
-    int? timeWindowStartMinute,
-    int? timeWindowEndHour,
-    int? timeWindowEndMinute,
     int? gracePeriodMinutes,
     int? maxNotifications,
     bool? isActive,
   }) {
     return CheckInConfig(
+      timingMode: timingMode ?? this.timingMode,
+      checkInHour: checkInHour ?? this.checkInHour,
+      checkInMinute: checkInMinute ?? this.checkInMinute,
       intervalMinutes: intervalMinutes ?? this.intervalMinutes,
-      timeWindowStartHour: timeWindowStartHour ?? this.timeWindowStartHour,
-      timeWindowStartMinute: timeWindowStartMinute ?? this.timeWindowStartMinute,
-      timeWindowEndHour: timeWindowEndHour ?? this.timeWindowEndHour,
-      timeWindowEndMinute: timeWindowEndMinute ?? this.timeWindowEndMinute,
       gracePeriodMinutes: gracePeriodMinutes ?? this.gracePeriodMinutes,
       maxNotifications: maxNotifications ?? this.maxNotifications,
       isActive: isActive ?? this.isActive,
@@ -56,11 +53,10 @@ class CheckInConfig extends Equatable {
 
   @override
   List<Object?> get props => [
+        timingMode,
+        checkInHour,
+        checkInMinute,
         intervalMinutes,
-        timeWindowStartHour,
-        timeWindowStartMinute,
-        timeWindowEndHour,
-        timeWindowEndMinute,
         gracePeriodMinutes,
         maxNotifications,
         isActive,

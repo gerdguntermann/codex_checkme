@@ -8,11 +8,13 @@ class ContactModel {
   final String id;
   final String name;
   final String email;
+  final String? phone;
 
   const ContactModel({
     required this.id,
     required this.name,
     required this.email,
+    this.phone,
   });
 
   factory ContactModel.fromJson(Map<String, dynamic> json) =>
@@ -24,7 +26,8 @@ class ContactModel {
         id: contact.id,
         name: contact.name,
         email: contact.email,
+        phone: contact.phone,
       );
 
-  Contact toDomain() => Contact(id: id, name: name, email: email);
+  Contact toDomain() => Contact(id: id, name: name, email: email, phone: phone);
 }

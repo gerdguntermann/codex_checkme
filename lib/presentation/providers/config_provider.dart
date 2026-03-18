@@ -1,30 +1,31 @@
+import 'dart:developer';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../domain/entities/check_in_config.dart';
-import '../../domain/usecases/get_config.dart';
-import '../../domain/usecases/save_config.dart';
-import '../../injection_container.dart';
 import 'auth_provider.dart';
+import 'service_providers.dart';
 
 class ConfigNotifier extends AsyncNotifier<CheckInConfig> {
   @override
   Future<CheckInConfig> build() async {
     final userId = ref.watch(currentUserIdProvider);
     if (userId == null) return CheckInConfig.defaults();
-    final useCase = sl<GetConfig>();
-    final result = await useCase(userId);
-    return result.fold((_) => CheckInConfig.defaults(), (config) => config);
+    log('build – loading config', name: 'ConfigNotifier');
+    return ref.read(configServiceProvider).getConfig(userId);
   }
 
   Future<void> saveConfig(CheckInConfig config) async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
     state = AsyncData(config);
-    final useCase = sl<SaveConfig>();
-    final result = await useCase(userId, config);
-    result.fold(
-      (failure) => state = AsyncError(failure.message, StackTrace.current),
-      (_) {},
-    );
+    log('saveConfig – saving', name: 'ConfigNotifier');
+    try {
+      await ref.read(configServiceProvider).saveConfig(userId, config);
+    } catch (e, stack) {
+      log('saveConfig – error: $e', name: 'ConfigNotifier');
+      state = AsyncError(e, stack);
+    }
   }
 }
 

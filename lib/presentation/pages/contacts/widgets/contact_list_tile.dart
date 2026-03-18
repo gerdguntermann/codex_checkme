@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:checkme/l10n/app_localizations.dart';
 import '../../../../domain/entities/contact.dart';
 
 class ContactListTile extends StatelessWidget {
@@ -15,6 +16,8 @@ class ContactListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return ListTile(
       leading: CircleAvatar(
         child: Text(
@@ -22,7 +25,9 @@ class ContactListTile extends StatelessWidget {
         ),
       ),
       title: Text(contact.name),
-      subtitle: Text(contact.email),
+      subtitle: Text(contact.phone != null
+          ? '${contact.email} · ${contact.phone}'
+          : contact.email),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -33,16 +38,17 @@ class ContactListTile extends StatelessWidget {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Delete Contact'),
-                  content: Text('Delete ${contact.name}?'),
+                  title: Text(l10n.deleteContact),
+                  content: Text(l10n.deleteContactConfirm(contact.name)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel'),
+                      child: Text(l10n.cancel),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      child: Text(l10n.delete,
+                          style: const TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),

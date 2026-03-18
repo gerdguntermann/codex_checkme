@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:checkme/l10n/app_localizations.dart';
 import '../../../providers/check_in_provider.dart';
 
 class CheckInButton extends ConsumerWidget {
@@ -9,6 +10,7 @@ class CheckInButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final checkInState = ref.watch(checkInNotifierProvider);
     final isLoading = checkInState.isLoading;
+    final l10n = AppLocalizations.of(context)!;
 
     return SizedBox(
       width: 200,
@@ -25,14 +27,14 @@ class CheckInButton extends ConsumerWidget {
         ),
         child: isLoading
             ? const CircularProgressIndicator(color: Colors.white)
-            : const Column(
+            : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check, size: 64),
-                  SizedBox(height: 8),
+                  const Icon(Icons.check, size: 64),
+                  const SizedBox(height: 8),
                   Text(
-                    'I\'m OK',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    l10n.checkInButton,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),

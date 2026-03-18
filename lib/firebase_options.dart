@@ -85,10 +85,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions linux = FirebaseOptions(
-    apiKey: 'REPLACE_WITH_LINUX_API_KEY',
-    appId: 'REPLACE_WITH_LINUX_APP_ID',
-    messagingSenderId: 'REPLACE_WITH_SENDER_ID',
-    projectId: 'REPLACE_WITH_PROJECT_ID',
-    storageBucket: 'REPLACE_WITH_PROJECT_ID.firebasestorage.app',
+    apiKey: 'AIzaSyDeaV76T2PGOSaYiRaoew7JXqJuvaeu14g',
+    appId: '1:296849038791:web:b259ef7df1b03a63078de2',
+    messagingSenderId: '296849038791',
+    projectId: 'checkme-app-a0e9e',
+    authDomain: 'checkme-app-a0e9e.firebaseapp.com',
+    storageBucket: 'checkme-app-a0e9e.firebasestorage.app',
   );
 }

@@ -1,1 +1,59 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"functions":[{"source":"functions","codebase":"default","ignore":["node_modules",".git","firebase-debug.log","firebase-debug.*.log","*.local.json"],"predeploy":["npm --prefix \"$RESOURCE_DIR\" run lint","npm --prefix \"$RESOURCE_DIR\" run build"]}],"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","destination":"/index.html"}]},"flutter":{"platforms":{"android":{"default":{"projectId":"checkme-app-a0e9e","appId":"1:296849038791:android:cc897d8073223223078de2","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"checkme-app-a0e9e","configurations":{"android":"1:296849038791:android:cc897d8073223223078de2","ios":"1:296849038791:ios:62c157e314a81b32078de2","macos":"1:296849038791:ios:62c157e314a81b32078de2","web":"1:296849038791:web:89d40aa2b05708c8078de2","windows":"1:296849038791:web:b259ef7df1b03a63078de2"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local.json"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "checkme-app-a0e9e",
+          "appId": "1:296849038791:android:cc897d8073223223078de2",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "checkme-app-a0e9e",
+          "configurations": {
+            "android": "1:296849038791:android:cc897d8073223223078de2",
+            "ios": "1:296849038791:ios:62c157e314a81b32078de2",
+            "macos": "1:296849038791:ios:62c157e314a81b32078de2",
+            "web": "1:296849038791:web:89d40aa2b05708c8078de2",
+            "windows": "1:296849038791:web:b259ef7df1b03a63078de2"
+          }
+        }
+      }
+    }
+  }
+}

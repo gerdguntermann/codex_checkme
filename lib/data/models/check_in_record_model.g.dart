@@ -17,5 +17,5 @@ Map<String, dynamic> _$CheckInRecordModelToJson(CheckInRecordModel instance) =>
     <String, dynamic>{
       'id': instance.id,
       'userId': instance.userId,
-      'timestamp': CheckInRecordModel._dateTimeToTimestamp(instance.timestamp),
+      'timestamp': instance.timestamp.toIso8601String(),
     };
