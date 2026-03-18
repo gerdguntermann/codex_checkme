@@ -1,8 +1,9 @@
-import 'package:flutter_test/flutter_test.dart';
+// Unit- und Widget-Tests befinden sich in:
+//   test/unit/
+//   test/services/
+//   test/widget/
+//
+// Integrationstests:
+//   integration_test/app_flow_test.dart
 
-void main() {
-  testWidgets('Placeholder test', (WidgetTester tester) async {
-    // Tests will be added after Firebase is configured via flutterfire configure.
-    expect(true, isTrue);
-  });
-}
+void main() {}

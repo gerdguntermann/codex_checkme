@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'package:checkme/core/utils/app_logger.dart';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,6 +19,7 @@ import 'presentation/providers/service_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLogger.initialize();
 
   log('Firebase initializing...', name: 'main');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

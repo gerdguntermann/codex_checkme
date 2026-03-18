@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'package:checkme/core/utils/app_logger.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
