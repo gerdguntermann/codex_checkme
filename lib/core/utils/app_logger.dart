@@ -16,6 +16,7 @@ class AppLogger {
       final dir = await getApplicationDocumentsDirectory();
       final date = DateTime.now().toIso8601String().substring(0, 10);
       _logFile = File('${dir.path}/checkme_$date.log');
+      dev.log('AppLogger: writing to ${_logFile!.path}', name: 'AppLogger');
     } catch (e) {
       dev.log('AppLogger.initialize failed: $e', name: 'AppLogger');
     }
