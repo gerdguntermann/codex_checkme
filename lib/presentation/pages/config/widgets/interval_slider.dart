@@ -34,7 +34,14 @@ class IntervalSlider extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: Theme.of(context).textTheme.titleMedium),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.titleMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(_display(value), style: Theme.of(context).textTheme.bodyLarge),
           ],
         ),
