@@ -8,6 +8,7 @@ class CheckInConfig extends Equatable {
   final int checkInMinute;
   final int intervalMinutes;
   final int gracePeriodMinutes;
+  final int preDeadlineMinutes;
   final int maxNotifications;
   final bool isActive;
 
@@ -17,6 +18,7 @@ class CheckInConfig extends Equatable {
     required this.checkInMinute,
     required this.intervalMinutes,
     required this.gracePeriodMinutes,
+    required this.preDeadlineMinutes,
     required this.maxNotifications,
     required this.isActive,
   });
@@ -27,6 +29,7 @@ class CheckInConfig extends Equatable {
         checkInMinute: 0,
         intervalMinutes: 240,
         gracePeriodMinutes: 30,
+        preDeadlineMinutes: 60,
         maxNotifications: 3,
         isActive: true,
       );
@@ -37,6 +40,7 @@ class CheckInConfig extends Equatable {
     int? checkInMinute,
     int? intervalMinutes,
     int? gracePeriodMinutes,
+    int? preDeadlineMinutes,
     int? maxNotifications,
     bool? isActive,
   }) {
@@ -46,6 +50,7 @@ class CheckInConfig extends Equatable {
       checkInMinute: checkInMinute ?? this.checkInMinute,
       intervalMinutes: intervalMinutes ?? this.intervalMinutes,
       gracePeriodMinutes: gracePeriodMinutes ?? this.gracePeriodMinutes,
+      preDeadlineMinutes: preDeadlineMinutes ?? this.preDeadlineMinutes,
       maxNotifications: maxNotifications ?? this.maxNotifications,
       isActive: isActive ?? this.isActive,
     );
@@ -58,6 +63,7 @@ class CheckInConfig extends Equatable {
         checkInMinute,
         intervalMinutes,
         gracePeriodMinutes,
+        preDeadlineMinutes,
         maxNotifications,
         isActive,
       ];

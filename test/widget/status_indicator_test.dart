@@ -30,11 +30,16 @@ List<Override> _overrides({CheckInRecord? record, required CheckInConfig config}
       configNotifierProvider.overrideWith(() => _FakeConfigNotifier(config)),
     ];
 
-CheckInConfig _intervalCfg({int intervalMinutes = 60, int gracePeriodMinutes = 10}) =>
+CheckInConfig _intervalCfg({
+  int intervalMinutes = 60,
+  int gracePeriodMinutes = 10,
+  int preDeadlineMinutes = 0,
+}) =>
     CheckInConfig.defaults().copyWith(
       timingMode: TimingMode.interval,
       intervalMinutes: intervalMinutes,
       gracePeriodMinutes: gracePeriodMinutes,
+      preDeadlineMinutes: preDeadlineMinutes,
     );
 
 CheckInRecord _record(Duration ago) => CheckInRecord(
@@ -99,6 +104,20 @@ void main() {
 
       expect(find.text('ÜBERFÄLLIG: '), findsOneWidget);
       expect(find.text('Check-in erforderlich!'), findsOneWidget);
+    });
+
+    testWidgets('windowOpen state: shows "FENSTER OFFEN"', (tester) async {
+      await tester.pumpWidget(buildTestApp(
+        const StatusIndicator(),
+        overrides: _overrides(
+          record: _record(const Duration(minutes: 50)),
+          config: _intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('FENSTER OFFEN: '), findsOneWidget);
+      expect(find.text('Check-in Fenster offen'), findsOneWidget);
     });
 
     testWidgets('shows next deadline label', (tester) async {

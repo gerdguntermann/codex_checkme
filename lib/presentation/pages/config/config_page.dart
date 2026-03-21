@@ -156,6 +156,16 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
 
                         // ── Shared controls ──────────────────────────
                         IntervalSlider(
+                          label: l10n.preDeadlineLabel,
+                          value: editing.preDeadlineMinutes,
+                          min: 5,
+                          max: 240,
+                          unit: l10n.minuteUnit,
+                          onChanged: (v) => setState(() => _editingConfig =
+                              editing.copyWith(preDeadlineMinutes: v)),
+                        ),
+                        const Divider(height: 24),
+                        IntervalSlider(
                           label: l10n.gracePeriodLabel,
                           value: editing.gracePeriodMinutes,
                           min: 0,

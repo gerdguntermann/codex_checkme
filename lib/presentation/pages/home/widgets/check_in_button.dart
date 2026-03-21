@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:checkme/l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 import '../../../providers/check_in_provider.dart';
+import '../../../providers/config_provider.dart';
+import '../../../../core/utils/time_utils.dart';
+import '../../../../domain/entities/check_in_config.dart';
 
 class CheckInButton extends ConsumerWidget {
   const CheckInButton({super.key});
@@ -9,32 +13,58 @@ class CheckInButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final checkInState = ref.watch(checkInNotifierProvider);
+    final configState = ref.watch(configNotifierProvider);
     final isLoading = checkInState.isLoading;
     final l10n = AppLocalizations.of(context)!;
+
+    final lastCheckIn = checkInState.valueOrNull;
+    final config = configState.valueOrNull;
+
+    final effectiveConfig = config ?? CheckInConfig.defaults();
+    final bool isAllowed =
+        TimeUtils.isCheckInAllowed(lastCheckIn?.timestamp, effectiveConfig);
+
+    String? availableFromText;
+    if (!isAllowed && lastCheckIn != null) {
+      final windowStart =
+          TimeUtils.checkInWindowStart(lastCheckIn.timestamp, effectiveConfig);
+      availableFromText =
+          l10n.checkInAvailableFrom(DateFormat('HH:mm').format(windowStart));
+    }
 
     return SizedBox(
       width: 200,
       height: 200,
       child: ElevatedButton(
-        onPressed: isLoading
+        onPressed: (isLoading || !isAllowed)
             ? null
             : () => ref.read(checkInNotifierProvider.notifier).performCheckIn(),
         style: ElevatedButton.styleFrom(
           shape: const CircleBorder(),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          elevation: 8,
+          backgroundColor: isAllowed
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          foregroundColor: isAllowed
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+          elevation: isAllowed ? 8 : 2,
         ),
         child: isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.check, size: 64),
+                  Icon(isAllowed ? Icons.check : Icons.lock_clock, size: 48),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.checkInButton,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    isAllowed
+                        ? l10n.checkInButton
+                        : (availableFromText ?? l10n.checkInButton),
+                    style: TextStyle(
+                      fontSize: isAllowed ? 20 : 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

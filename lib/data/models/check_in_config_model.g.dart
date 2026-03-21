@@ -13,6 +13,7 @@ CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
       checkInMinute: (json['checkInMinute'] as num?)?.toInt() ?? 0,
       intervalMinutes: (json['intervalMinutes'] as num?)?.toInt() ?? 240,
       gracePeriodMinutes: (json['gracePeriodMinutes'] as num).toInt(),
+      preDeadlineMinutes: (json['preDeadlineMinutes'] as num?)?.toInt() ?? 60,
       maxNotifications: (json['maxNotifications'] as num).toInt(),
       isActive: json['isActive'] as bool,
     );
@@ -24,6 +25,7 @@ Map<String, dynamic> _$CheckInConfigModelToJson(CheckInConfigModel instance) =>
       'checkInMinute': instance.checkInMinute,
       'intervalMinutes': instance.intervalMinutes,
       'gracePeriodMinutes': instance.gracePeriodMinutes,
+      'preDeadlineMinutes': instance.preDeadlineMinutes,
       'maxNotifications': instance.maxNotifications,
       'isActive': instance.isActive,
     };

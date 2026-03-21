@@ -170,6 +170,12 @@ abstract class AppLocalizations {
   /// **'OK'**
   String get statusOk;
 
+  /// No description provided for @statusWindowOpen.
+  ///
+  /// In de, this message translates to:
+  /// **'FENSTER OFFEN'**
+  String get statusWindowOpen;
+
   /// No description provided for @checkInRequired.
   ///
   /// In de, this message translates to:
@@ -187,6 +193,24 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Alles gut'**
   String get allGood;
+
+  /// No description provided for @windowOpenMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Check-in Fenster offen'**
+  String get windowOpenMessage;
+
+  /// No description provided for @checkInWindowStartLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Check-in ab'**
+  String get checkInWindowStartLabel;
+
+  /// No description provided for @checkInAvailableFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'Verfügbar ab {time}'**
+  String checkInAvailableFrom(String time);
 
   /// No description provided for @lastCheckIn.
   ///
@@ -257,8 +281,14 @@ abstract class AppLocalizations {
   /// No description provided for @gracePeriodLabel.
   ///
   /// In de, this message translates to:
-  /// **'Karenzzeit'**
+  /// **'Karenzzeit nach Deadline'**
   String get gracePeriodLabel;
+
+  /// No description provided for @preDeadlineLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Check-in Fenster vor Deadline'**
+  String get preDeadlineLabel;
 
   /// No description provided for @minuteUnit.
   ///

@@ -15,9 +15,18 @@
   "statusOverdue": "OVERDUE",
   "statusGrace": "GRACE PERIOD",
   "statusOk": "OK",
+  "statusWindowOpen": "WINDOW OPEN",
   "checkInRequired": "Check-in required!",
   "graceMessage": "Check-in soon required",
   "allGood": "All good",
+  "windowOpenMessage": "Check-in window open",
+  "checkInWindowStartLabel": "Check-in from",
+  "checkInAvailableFrom": "Available from {time}",
+  "@checkInAvailableFrom": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
   "lastCheckIn": "Last check-in",
   "nextDeadline": "Next deadline",
   "tomorrow": "tomorrow",
@@ -30,7 +39,8 @@
   "timeUnitSuffix": "",
   "checkInIntervalLabel": "Check-in Interval",
   "hourUnit": "h",
-  "gracePeriodLabel": "Grace Period",
+  "gracePeriodLabel": "Grace Period after deadline",
+  "preDeadlineLabel": "Check-in window before deadline",
   "minuteUnit": "min",
   "maxNotificationsLabel": "Max. notifications / day",
   "settingsSaved": "Settings saved",

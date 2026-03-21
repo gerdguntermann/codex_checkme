@@ -75,6 +75,12 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     l10n.statusOk,
                     l10n.allGood,
                   ),
+                CheckInState.windowOpen => (
+                    Icons.lock_open,
+                    Colors.amber,
+                    l10n.statusWindowOpen,
+                    l10n.windowOpenMessage,
+                  ),
                 CheckInState.grace => (
                     Icons.warning_amber,
                     Colors.orange,
@@ -88,6 +94,11 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     l10n.checkInRequired,
                   ),
               };
+
+              final windowStart =
+                  TimeUtils.checkInWindowStart(lastCheckIn.timestamp, config);
+              final windowStartStr =
+                  DateFormat('HH:mm').format(windowStart);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,12 +118,19 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                   ),
                   _StatusRow(
                     icon: Icons.timer_outlined,
-                    color: state == CheckInState.ok
+                    color: state == CheckInState.ok || state == CheckInState.windowOpen
                         ? Colors.orange
                         : color,
                     label: l10n.nextDeadline,
                     value: deadlineStr,
                   ),
+                  if (state == CheckInState.ok)
+                    _StatusRow(
+                      icon: Icons.lock_clock,
+                      color: Colors.grey,
+                      label: l10n.checkInWindowStartLabel,
+                      value: windowStartStr,
+                    ),
                 ],
               );
             }

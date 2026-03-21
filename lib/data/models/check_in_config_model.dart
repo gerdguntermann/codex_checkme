@@ -14,6 +14,8 @@ class CheckInConfigModel {
   @JsonKey(defaultValue: 240)
   final int intervalMinutes;
   final int gracePeriodMinutes;
+  @JsonKey(defaultValue: 60)
+  final int preDeadlineMinutes;
   final int maxNotifications;
   final bool isActive;
 
@@ -23,6 +25,7 @@ class CheckInConfigModel {
     required this.checkInMinute,
     required this.intervalMinutes,
     required this.gracePeriodMinutes,
+    required this.preDeadlineMinutes,
     required this.maxNotifications,
     required this.isActive,
   });
@@ -39,6 +42,7 @@ class CheckInConfigModel {
         checkInMinute: config.checkInMinute,
         intervalMinutes: config.intervalMinutes,
         gracePeriodMinutes: config.gracePeriodMinutes,
+        preDeadlineMinutes: config.preDeadlineMinutes,
         maxNotifications: config.maxNotifications,
         isActive: config.isActive,
       );
@@ -52,6 +56,7 @@ class CheckInConfigModel {
         checkInMinute: checkInMinute,
         intervalMinutes: intervalMinutes,
         gracePeriodMinutes: gracePeriodMinutes,
+        preDeadlineMinutes: preDeadlineMinutes,
         maxNotifications: maxNotifications,
         isActive: isActive,
       );

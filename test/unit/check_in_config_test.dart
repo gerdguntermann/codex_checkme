@@ -10,6 +10,7 @@ void main() {
       expect(cfg.checkInMinute, 0);
       expect(cfg.intervalMinutes, 240);
       expect(cfg.gracePeriodMinutes, 30);
+      expect(cfg.preDeadlineMinutes, 60);
       expect(cfg.maxNotifications, 3);
       expect(cfg.isActive, isTrue);
     });

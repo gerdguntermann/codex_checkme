@@ -1,6 +1,6 @@
 import '../../domain/entities/check_in_config.dart';
 
-enum CheckInState { ok, grace, overdue }
+enum CheckInState { ok, windowOpen, grace, overdue }
 
 class TimeUtils {
   static DateTime previousFixedDeadline(CheckInConfig config) {
@@ -26,6 +26,12 @@ class TimeUtils {
         : todayDeadline.add(const Duration(days: 1));
   }
 
+  /// Start of the pre-deadline check-in window.
+  static DateTime checkInWindowStart(DateTime lastCheckIn, CheckInConfig config) {
+    final deadline = nextDeadline(lastCheckIn, config);
+    return deadline.subtract(Duration(minutes: config.preDeadlineMinutes));
+  }
+
   /// Returns the current check-in state based on deadline and grace period.
   static CheckInState getState(DateTime? lastCheckIn, CheckInConfig config) {
     if (lastCheckIn == null) return CheckInState.ok;
@@ -39,17 +45,35 @@ class TimeUtils {
         return CheckInState.overdue;
       }
       if (now.isAfter(deadline)) return CheckInState.grace;
+      final windowStart =
+          deadline.subtract(Duration(minutes: config.preDeadlineMinutes));
+      if (now.isAfter(windowStart)) return CheckInState.windowOpen;
       return CheckInState.ok;
     }
 
     // fixedTime
     final prev = previousFixedDeadline(config);
-    if (lastCheckIn.isAfter(prev)) return CheckInState.ok;
+    if (lastCheckIn.isAfter(prev)) {
+      // checked in after last deadline → check window for next deadline
+      final next = nextDeadline(lastCheckIn, config);
+      final windowStart =
+          next.subtract(Duration(minutes: config.preDeadlineMinutes));
+      if (now.isAfter(windowStart)) return CheckInState.windowOpen;
+      return CheckInState.ok;
+    }
+    // missed last deadline
     if (now.isAfter(prev.add(Duration(minutes: config.gracePeriodMinutes)))) {
       return CheckInState.overdue;
     }
     if (now.isAfter(prev)) return CheckInState.grace;
     return CheckInState.ok;
+  }
+
+  /// Returns true when the user is allowed to perform a check-in.
+  /// Allowed in windowOpen, grace, overdue states, and on first use (null).
+  static bool isCheckInAllowed(DateTime? lastCheckIn, CheckInConfig config) {
+    if (lastCheckIn == null) return true;
+    return getState(lastCheckIn, config) != CheckInState.ok;
   }
 
   static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) =>

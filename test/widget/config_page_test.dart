@@ -84,7 +84,7 @@ void main() {
         await tester.pumpWidget(
             _buildConfigPage(CheckInConfig.defaults().copyWith(timingMode: mode)));
         await tester.pump();
-        expect(find.text('Karenzzeit'), findsOneWidget, reason: 'mode: $mode');
+        expect(find.text('Karenzzeit nach Deadline'), findsOneWidget, reason: 'mode: $mode');
       }
     });
 

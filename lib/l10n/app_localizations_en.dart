@@ -49,6 +49,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusOk => 'OK';
 
   @override
+  String get statusWindowOpen => 'WINDOW OPEN';
+
+  @override
   String get checkInRequired => 'Check-in required!';
 
   @override
@@ -56,6 +59,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allGood => 'All good';
+
+  @override
+  String get windowOpenMessage => 'Check-in window open';
+
+  @override
+  String get checkInWindowStartLabel => 'Check-in from';
+
+  @override
+  String checkInAvailableFrom(String time) {
+    return 'Available from $time';
+  }
 
   @override
   String get lastCheckIn => 'Last check-in';
@@ -91,7 +105,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hourUnit => 'h';
 
   @override
-  String get gracePeriodLabel => 'Grace Period';
+  String get gracePeriodLabel => 'Grace Period after deadline';
+
+  @override
+  String get preDeadlineLabel => 'Check-in window before deadline';
 
   @override
   String get minuteUnit => 'min';

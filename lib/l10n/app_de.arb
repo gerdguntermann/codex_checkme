@@ -25,9 +25,18 @@
   "statusOverdue": "ÜBERFÄLLIG",
   "statusGrace": "KARENZZEIT",
   "statusOk": "OK",
+  "statusWindowOpen": "FENSTER OFFEN",
   "checkInRequired": "Check-in erforderlich!",
   "graceMessage": "Check-in bald erforderlich",
   "allGood": "Alles gut",
+  "windowOpenMessage": "Check-in Fenster offen",
+  "checkInWindowStartLabel": "Check-in ab",
+  "checkInAvailableFrom": "Verfügbar ab {time}",
+  "@checkInAvailableFrom": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
   "lastCheckIn": "Letzter Check-in",
   "nextDeadline": "Nächste Deadline",
   "tomorrow": "morgen",
@@ -40,7 +49,8 @@
   "timeUnitSuffix": " Uhr",
   "checkInIntervalLabel": "Check-in Intervall",
   "hourUnit": "h",
-  "gracePeriodLabel": "Karenzzeit",
+  "gracePeriodLabel": "Karenzzeit nach Deadline",
+  "preDeadlineLabel": "Check-in Fenster vor Deadline",
   "minuteUnit": "min",
   "maxNotificationsLabel": "Max. Benachrichtigungen / Tag",
   "settingsSaved": "Einstellungen gespeichert",

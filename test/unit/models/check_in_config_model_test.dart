@@ -44,6 +44,7 @@ void main() {
         checkInMinute: 0,
         intervalMinutes: 60,
         gracePeriodMinutes: 10,
+        preDeadlineMinutes: 60,
         maxNotifications: 3,
         isActive: true,
       );
@@ -74,6 +75,7 @@ void main() {
         checkInMinute: 0,
         intervalMinutes: 240,
         gracePeriodMinutes: 30,
+        preDeadlineMinutes: 60,
         maxNotifications: 3,
         isActive: true,
       );
