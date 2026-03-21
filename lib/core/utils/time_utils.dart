@@ -53,15 +53,28 @@ class TimeUtils {
 
     // fixedTime
     final prev = previousFixedDeadline(config);
-    if (lastCheckIn.isAfter(prev)) {
-      // checked in after last deadline → check window for next deadline
-      final next = nextDeadline(lastCheckIn, config);
-      final windowStart =
-          next.subtract(Duration(minutes: config.preDeadlineMinutes));
-      if (now.isAfter(windowStart)) return CheckInState.windowOpen;
+    final prevWindowStart =
+        prev.subtract(Duration(minutes: config.preDeadlineMinutes));
+
+    // A check-in is valid for the most recent deadline cycle if it occurred
+    // at or after the window opening of that cycle (not just after the deadline).
+    if (!lastCheckIn.isBefore(prevWindowStart)) {
+      // Valid check-in – check if the next cycle's window is open.
+      final nextWindowStart = prev
+          .add(const Duration(days: 1))
+          .subtract(Duration(minutes: config.preDeadlineMinutes));
+      if (now.isAfter(nextWindowStart)) return CheckInState.windowOpen;
       return CheckInState.ok;
     }
-    // missed last deadline
+
+    // No valid check-in for the most recent cycle.
+    // Check if the upcoming deadline's window is currently open (user can still fix it).
+    final upcoming = nextDeadline(lastCheckIn, config);
+    final upcomingWindowStart =
+        upcoming.subtract(Duration(minutes: config.preDeadlineMinutes));
+    if (now.isAfter(upcomingWindowStart)) return CheckInState.windowOpen;
+
+    // Not in any window – determine overdue or grace from the most recent deadline.
     if (now.isAfter(prev.add(Duration(minutes: config.gracePeriodMinutes)))) {
       return CheckInState.overdue;
     }

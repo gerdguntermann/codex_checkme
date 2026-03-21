@@ -178,6 +178,23 @@ void main() {
     test('null lastCheckIn returns ok', () {
       expect(TimeUtils.getState(null, fixedCfg(hour: 9)), CheckInState.ok);
     });
+
+    test('ok: checked in within window BEFORE deadline, deadline now passed', () {
+      final now = DateTime.now();
+      // Deadline 30 min ago, window opened 90 min ago (preDeadlineMinutes=60)
+      // Check-in was 45 min ago = within the window, before the deadline
+      final deadlineHour = now.subtract(const Duration(minutes: 30)).hour;
+      final deadlineMinute = now.subtract(const Duration(minutes: 30)).minute;
+      final cfg = fixedCfg(
+        hour: deadlineHour,
+        minute: deadlineMinute,
+        gracePeriodMinutes: 30,
+        preDeadlineMinutes: 60,
+      );
+      final last = now.subtract(const Duration(minutes: 45));
+      // Bug fix: pre-deadline check-in should count as valid AFTER deadline passes
+      expect(TimeUtils.getState(last, cfg), CheckInState.ok);
+    });
   });
 
   group('fixedTime mode – nextDeadline', () {
