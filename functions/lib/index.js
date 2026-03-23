@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendOverdueNotification = exports.onOverdueTrigger = void 0;
+exports.sendOverdueNotification = exports.cleanupBackgroundLogs = exports.onOverdueTrigger = void 0;
 const admin = require("firebase-admin");
 const functions = require("firebase-functions");
 const resend_1 = require("resend");
@@ -25,6 +25,34 @@ exports.onOverdueTrigger = functions.firestore
     await sendOverdueNotifications(userId);
     // Delete the trigger doc after processing
     await snap.ref.delete();
+});
+// ─── Scheduled cleanup: delete background_logs older than 2 days ─────────────
+exports.cleanupBackgroundLogs = functions.pubsub
+    .schedule("0 3 * * *") // daily at 03:00
+    .timeZone("Europe/Berlin")
+    .onRun(async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 2);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoff);
+    const oldLogs = await db
+        .collectionGroup("background_logs")
+        .where("ranAt", "<", cutoffTimestamp)
+        .get();
+    if (oldLogs.empty) {
+        functions.logger.info("cleanupBackgroundLogs: nothing to delete");
+        return;
+    }
+    // Firestore batch limit is 500 operations
+    const chunks = [];
+    for (let i = 0; i < oldLogs.docs.length; i += 500) {
+        chunks.push(oldLogs.docs.slice(i, i + 500));
+    }
+    for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+    }
+    functions.logger.info(`cleanupBackgroundLogs: deleted ${oldLogs.docs.length} entries older than ${cutoff.toISOString()}`);
 });
 // ─── Callable function for manual triggering / testing ───────────────────────
 exports.sendOverdueNotification = functions.https.onCall(async (data, context) => {
@@ -73,18 +101,37 @@ async function sendOverdueNotifications(userId) {
     // Send emails via Resend
     const resend = getResend();
     const fromAddress = (_b = process.env.RESEND_FROM) !== null && _b !== void 0 ? _b : "CheckMe <onboarding@resend.dev>";
+    const now = new Date().toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
     await resend.emails.send({
         from: fromAddress,
         to: recipientEmails,
-        subject: "CheckMe: No recent check-in",
+        subject: "⚠️ CheckMe: Kein Check-in erfolgt",
         html: `
-      <h2>CheckMe Alert</h2>
-      <p>The monitored person has not checked in within the expected time window.</p>
-      <p>Please verify their well-being.</p>
-      <hr>
-      <small>This message was sent automatically by CheckMe.</small>
+      <!DOCTYPE html>
+      <html lang="de">
+      <head><meta charset="UTF-8"></head>
+      <body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+        <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="background: #d32f2f; padding: 24px; text-align: center;">
+            <h1 style="color: #fff; margin: 0; font-size: 24px;">⚠️ CheckMe Alert</h1>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 16px; color: #333; margin-top: 0;">
+              Die überwachte Person hat sich <strong>nicht innerhalb des erwarteten Zeitfensters</strong> eingecheckt.
+            </p>
+            <div style="background: #fff3e0; border-left: 4px solid #f57c00; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;">
+              <strong style="color: #e65100;">Bitte prüfe ihr Wohlbefinden.</strong>
+            </div>
+            <p style="color: #666; font-size: 14px;">Zeitpunkt der Benachrichtigung: ${now}</p>
+          </div>
+          <div style="background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999;">
+            Diese Nachricht wurde automatisch von <strong>CheckMe</strong> gesendet.
+          </div>
+        </div>
+      </body>
+      </html>
     `,
-        text: "CheckMe Alert: The monitored person has not checked in within the expected time window. Please verify their well-being.",
+        text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
     });
     functions.logger.info("Notification emails sent via Resend", { userId, recipients: recipientEmails });
     // Log the notification
