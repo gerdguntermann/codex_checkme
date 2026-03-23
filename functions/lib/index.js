@@ -77,15 +77,23 @@ async function sendOverdueNotifications(userId) {
     const config = configSnap.data();
     if (!config.isActive)
         return;
-    // Check maxNotifications guard – count notifications sent today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Check maxNotifications guard – count notifications sent since the last check-in.
+    // Using "since last check-in" instead of "since midnight" prevents repeated
+    // nightly emails when the user is overdue across multiple days.
+    const checkInsSnap = await userRef
+        .collection("check_ins")
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
+    const lastCheckInMs = checkInsSnap.empty
+        ? 0
+        : checkInsSnap.docs[0].data().timestamp.toMillis();
     const logsSnap = await userRef
         .collection("notification_logs")
-        .where("sentAt", ">=", today.getTime())
+        .where("sentAt", ">=", lastCheckInMs)
         .get();
     if (logsSnap.size >= ((_a = config.maxNotifications) !== null && _a !== void 0 ? _a : 3)) {
-        functions.logger.info("Max notifications reached for user", { userId, count: logsSnap.size });
+        functions.logger.info("Max notifications reached for user since last check-in", { userId, count: logsSnap.size });
         return;
     }
     // Load contacts
