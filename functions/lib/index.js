@@ -49,15 +49,23 @@ async function sendOverdueNotifications(userId) {
     const config = configSnap.data();
     if (!config.isActive)
         return;
-    // Check maxNotifications guard – count notifications sent today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Check maxNotifications guard – count notifications sent since the last check-in.
+    // Using "since last check-in" instead of "since midnight" prevents repeated
+    // nightly emails when the user is overdue across multiple days.
+    const checkInsSnap = await userRef
+        .collection("check_ins")
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
+    const lastCheckInMs = checkInsSnap.empty
+        ? 0
+        : checkInsSnap.docs[0].data().timestamp.toMillis();
     const logsSnap = await userRef
         .collection("notification_logs")
-        .where("sentAt", ">=", today.getTime())
+        .where("sentAt", ">=", lastCheckInMs)
         .get();
     if (logsSnap.size >= ((_a = config.maxNotifications) !== null && _a !== void 0 ? _a : 3)) {
-        functions.logger.info("Max notifications reached for user", { userId, count: logsSnap.size });
+        functions.logger.info("Max notifications reached for user since last check-in", { userId, count: logsSnap.size });
         return;
     }
     // Load contacts
@@ -73,18 +81,37 @@ async function sendOverdueNotifications(userId) {
     // Send emails via Resend
     const resend = getResend();
     const fromAddress = (_b = process.env.RESEND_FROM) !== null && _b !== void 0 ? _b : "CheckMe <onboarding@resend.dev>";
+    const now = new Date().toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
     await resend.emails.send({
         from: fromAddress,
         to: recipientEmails,
-        subject: "CheckMe: No recent check-in",
+        subject: "⚠️ CheckMe: Kein Check-in erfolgt",
         html: `
-      <h2>CheckMe Alert</h2>
-      <p>The monitored person has not checked in within the expected time window.</p>
-      <p>Please verify their well-being.</p>
-      <hr>
-      <small>This message was sent automatically by CheckMe.</small>
+      <!DOCTYPE html>
+      <html lang="de">
+      <head><meta charset="UTF-8"></head>
+      <body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+        <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="background: #d32f2f; padding: 24px; text-align: center;">
+            <h1 style="color: #fff; margin: 0; font-size: 24px;">⚠️ CheckMe Alert</h1>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 16px; color: #333; margin-top: 0;">
+              Die überwachte Person hat sich <strong>nicht innerhalb des erwarteten Zeitfensters</strong> eingecheckt.
+            </p>
+            <div style="background: #fff3e0; border-left: 4px solid #f57c00; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;">
+              <strong style="color: #e65100;">Bitte prüfe ihr Wohlbefinden.</strong>
+            </div>
+            <p style="color: #666; font-size: 14px;">Zeitpunkt der Benachrichtigung: ${now}</p>
+          </div>
+          <div style="background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999;">
+            Diese Nachricht wurde automatisch von <strong>CheckMe</strong> gesendet.
+          </div>
+        </div>
+      </body>
+      </html>
     `,
-        text: "CheckMe Alert: The monitored person has not checked in within the expected time window. Please verify their well-being.",
+        text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
     });
     functions.logger.info("Notification emails sent via Resend", { userId, recipients: recipientEmails });
     // Log the notification
