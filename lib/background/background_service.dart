@@ -9,6 +9,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../core/constants/app_constants.dart';
+import '../core/constants/firestore_constants.dart';
 import '../core/utils/time_utils.dart';
 import '../data/check_in_service.dart';
 import '../data/config_service.dart';
@@ -46,17 +47,34 @@ void callbackDispatcher() {
       log('isOverdue: $isOverdue', name: 'BackgroundService');
       final now = DateTime.now();
 
-      await firestore
-          .collection('users')
+      final logsRef = firestore
+          .collection(FirestoreConstants.usersCollection)
           .doc(userId)
-          .collection('background_logs')
-          .add({
-            'ranAt': Timestamp.fromDate(now),
-            'isActive': config.isActive,
-            'hasLastCheckIn': lastCheckIn != null,
-            'lastCheckInAt': lastCheckIn != null ? Timestamp.fromDate(lastCheckIn.timestamp) : null,
-            'isOverdue': isOverdue,
-          });
+          .collection(FirestoreConstants.backgroundLogsCollection);
+
+      await logsRef.add({
+        'ranAt': Timestamp.fromDate(now),
+        'isActive': config.isActive,
+        'hasLastCheckIn': lastCheckIn != null,
+        'lastCheckInAt': lastCheckIn != null ? Timestamp.fromDate(lastCheckIn.timestamp) : null,
+        'isOverdue': isOverdue,
+      });
+
+      // Rotate: delete all log entries older than the retention threshold.
+      final cutoff = now.subtract(
+          const Duration(days: FirestoreConstants.backgroundLogRetentionDays));
+      final oldLogs = await logsRef
+          .where('ranAt', isLessThan: Timestamp.fromDate(cutoff))
+          .get();
+      if (oldLogs.docs.isNotEmpty) {
+        final batch = firestore.batch();
+        for (final doc in oldLogs.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        log('deleted ${oldLogs.docs.length} old background_log entries',
+            name: 'BackgroundService');
+      }
 
       if (!config.isActive) {
         log('monitoring inactive – done', name: 'BackgroundService');
@@ -86,9 +104,9 @@ void callbackDispatcher() {
         final userId = prefs.getString(AppConstants.userIdKey);
         if (userId != null) {
           await FirebaseFirestore.instance
-              .collection('users')
+              .collection(FirestoreConstants.usersCollection)
               .doc(userId)
-              .collection('background_logs')
+              .collection(FirestoreConstants.backgroundLogsCollection)
               .add({
                 'ranAt': Timestamp.fromDate(DateTime.now()),
                 'error': e.toString(),

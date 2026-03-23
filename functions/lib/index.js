@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendOverdueNotification = exports.onOverdueTrigger = void 0;
+exports.sendOverdueNotification = exports.cleanupBackgroundLogs = exports.onOverdueTrigger = void 0;
 const admin = require("firebase-admin");
 const functions = require("firebase-functions");
 const resend_1 = require("resend");
@@ -25,6 +25,34 @@ exports.onOverdueTrigger = functions.firestore
     await sendOverdueNotifications(userId);
     // Delete the trigger doc after processing
     await snap.ref.delete();
+});
+// ─── Scheduled cleanup: delete background_logs older than 2 days ─────────────
+exports.cleanupBackgroundLogs = functions.pubsub
+    .schedule("0 3 * * *") // daily at 03:00
+    .timeZone("Europe/Berlin")
+    .onRun(async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 2);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoff);
+    const oldLogs = await db
+        .collectionGroup("background_logs")
+        .where("ranAt", "<", cutoffTimestamp)
+        .get();
+    if (oldLogs.empty) {
+        functions.logger.info("cleanupBackgroundLogs: nothing to delete");
+        return;
+    }
+    // Firestore batch limit is 500 operations
+    const chunks = [];
+    for (let i = 0; i < oldLogs.docs.length; i += 500) {
+        chunks.push(oldLogs.docs.slice(i, i + 500));
+    }
+    for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+    }
+    functions.logger.info(`cleanupBackgroundLogs: deleted ${oldLogs.docs.length} entries older than ${cutoff.toISOString()}`);
 });
 // ─── Callable function for manual triggering / testing ───────────────────────
 exports.sendOverdueNotification = functions.https.onCall(async (data, context) => {
