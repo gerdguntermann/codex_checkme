@@ -9,7 +9,7 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
-  String get appTitle => 'CheckMe';
+  String get appTitle => 'My Daily OK';
 
   @override
   String get tooltipContacts => 'Kontakte';
