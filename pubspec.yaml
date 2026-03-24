@@ -1,5 +1,5 @@
 name: checkme
-description: "Health monitoring app - press the button regularly or contacts get notified."
+description: "My Daily OK – health monitoring app. Press the button regularly or your contacts get notified."
 publish_to: 'none'
 version: 1.0.0+1
 
