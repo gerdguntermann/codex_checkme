@@ -101,9 +101,10 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
     ? 0
     : (checkInsSnap.docs[0].data().timestamp as admin.firestore.Timestamp).toMillis();
 
+  const lastCheckInTimestamp = admin.firestore.Timestamp.fromMillis(lastCheckInMs);
   const logsSnap = await userRef
     .collection("notification_logs")
-    .where("sentAt", ">=", lastCheckInMs)
+    .where("sentAt", ">=", lastCheckInTimestamp)
     .get();
 
   if (logsSnap.size >= (config.maxNotifications ?? 3)) {
@@ -166,7 +167,7 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
   // Log the notification
   await userRef.collection("notification_logs").add({
     userId,
-    sentAt: Date.now(),
+    sentAt: admin.firestore.Timestamp.now(),
     recipientEmails,
   });
 }
