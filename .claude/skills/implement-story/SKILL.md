@@ -21,15 +21,58 @@ Setzt eine GitHub Issue (User Story) vollständig um – von Branch-Erstellung b
 - `git` verfügbar
 - `CLAUDE.md` im Projekt-Root vorhanden
 - GitHub Repository verbunden (`git remote -v`)
+- GitHub Project (Kanban Board) angelegt (optional, aber empfohlen)
+
+---
+
+## Kanban-Hilfsfunktionen
+
+### Project-ID ermitteln (einmalig)
+```bash
+gh project list --owner {github-username}
+```
+Merke dir die **Project-Nummer** (z.B. `1`) – sie wird in allen Board-Operationen benötigt.
+
+### Item-ID einer Issue ermitteln
+```bash
+gh project item-list {PROJECT_NR} --owner {github-username} \
+  --format json | grep -A5 '"number": {ISSUE_NUMMER}'
+```
+
+### Status einer Issue im Board setzen
+```bash
+# Verfügbare Status-Optionen anzeigen
+gh project field-list {PROJECT_NR} --owner {github-username}
+
+# Status setzen (benötigt item-id und field-id aus den obigen Befehlen)
+gh project item-edit \
+  --project-id {PROJECT_ID} \
+  --id {ITEM_ID} \
+  --field-id {STATUS_FIELD_ID} \
+  --single-select-option-id {OPTION_ID}
+```
+
+**Hinweis:** Falls Project-ID oder Field-IDs unbekannt sind, diese einmalig ermitteln und
+in `CLAUDE.md` unter einem Abschnitt „GitHub Project" dokumentieren, z.B.:
+```
+## GitHub Project
+Project-Nr:      1
+Status Field-ID: PVTSSF_xxx
+Backlog-ID:      xxx
+Ready-ID:        xxx
+In Progress-ID:  xxx
+In Review-ID:    xxx
+Done-ID:         xxx
+```
 
 ---
 
 ## Workflow
 
-### Schritt 1 – Issue lesen
+### Schritt 1 – Issue lesen & Board aktualisieren
 
 ```bash
-gh issue view {ISSUE_NUMMER} --json number,title,body,labels,milestone
+gh issue view {ISSUE_NUMMER} --json number,title,body,labels,milestone,projectItems
 ```
 
 Extrahiere aus der Issue:
@@ -40,9 +83,45 @@ Extrahiere aus der Issue:
 
 Wenn die Issue nicht existiert oder keine Akzeptanzkriterien enthält: Nutzer fragen bevor fortgefahren wird.
 
+**Kanban: Issue → „In Progress" setzen**
+
+Prüfe ob GitHub Project-Daten in `CLAUDE.md` hinterlegt sind. Falls ja:
+```bash
+gh project item-edit \
+  --project-id {PROJECT_ID} \
+  --id {ITEM_ID} \
+  --field-id {STATUS_FIELD_ID} \
+  --single-select-option-id {IN_PROGRESS_ID}
+```
+Falls Project-Daten fehlen: Schritt überspringen und Nutzer am Ende darauf hinweisen.
+
 ---
 
-### Schritt 2 – Branch anlegen
+### Schritt 2 – Abhängigkeiten prüfen
+
+Lies den Issue-Body und suche nach Hinweisen auf Abhängigkeiten:
+- Schlüsselwörter: „Verwandt mit", „Depends on", „Benötigt", „Blocks", „Blocked by"
+- GitHub-Querverweise: `#NNN` im Body
+
+**Für jede gefundene Abhängigkeit:**
+```bash
+gh issue view {ABHAENGIGE_ISSUE_NR} --json number,title,state,body
+```
+
+Entscheide dann:
+
+| Situation | Branch-Basis |
+|---|---|
+| Keine Abhängigkeit | `main` |
+| Abhängige Issue bereits gemergt | `main` |
+| Abhängige Issue als offener PR vorhanden | `feature/{andere-nummer}-{slug}` |
+| Abhängige Issue noch nicht begonnen | Nutzer fragen: zuerst #X implementieren? |
+
+Informiere den Nutzer kurz über die Entscheidung, bevor der Branch angelegt wird.
+
+---
+
+### Schritt 3 – Branch anlegen
 
 Branch-Name Schema: `feature/{nummer}-{slug}`
 
@@ -53,8 +132,14 @@ Slug-Regeln:
 - Maximal 40 Zeichen
 
 ```bash
+# Ohne Abhängigkeit:
 git checkout main
 git pull origin main
+git checkout -b feature/{nummer}-{slug}
+
+# Mit Abhängigkeit auf offenen Branch:
+git checkout feature/{andere-nummer}-{slug}
+git pull origin feature/{andere-nummer}-{slug}
 git checkout -b feature/{nummer}-{slug}
 ```
 
@@ -62,7 +147,7 @@ Beispiel: Issue #17 „Push Notifications für Überfälligkeit" → `feature/17
 
 ---
 
-### Schritt 3 – CLAUDE.md lesen
+### Schritt 4 – CLAUDE.md lesen
 
 Lies `CLAUDE.md` vollständig. Beachte insbesondere:
 - Architektur-Regeln (Clean Architecture Schichten)
@@ -72,7 +157,7 @@ Lies `CLAUDE.md` vollständig. Beachte insbesondere:
 
 ---
 
-### Schritt 4 – Implementierung
+### Schritt 5 – Implementierung
 
 Folge dem **9-Schritte Clean Architecture Workflow** aus `CLAUDE.md`:
 
@@ -100,7 +185,7 @@ Alle Fehler beheben bevor weiter gegangen wird.
 
 ---
 
-### Schritt 5 – Commit
+### Schritt 6 – Commit
 
 ```bash
 git add .
@@ -123,7 +208,7 @@ Closes #{nummer}"
 
 ---
 
-### Schritt 6 – Pull Request erstellen
+### Schritt 7 – Pull Request erstellen & Board aktualisieren
 
 ```bash
 gh pr create \
@@ -147,6 +232,16 @@ Closes #{nummer}
   --base main
 ```
 
+**Kanban: Issue → „In Review" setzen**
+
+```bash
+gh project item-edit \
+  --project-id {PROJECT_ID} \
+  --id {ITEM_ID} \
+  --field-id {STATUS_FIELD_ID} \
+  --single-select-option-id {IN_REVIEW_ID}
+```
+
 ---
 
 ## Ausgabe am Ende
@@ -154,9 +249,22 @@ Closes #{nummer}
 Zeige dem Nutzer:
 1. PR-URL
 2. `git diff main...HEAD --stat` (Übersicht der Änderungen)
-3. Offene Punkte / bekannte Einschränkungen (falls vorhanden)
+3. Aktueller Kanban-Status der Issue
+4. Offene Punkte / bekannte Einschränkungen (falls vorhanden)
 
 **Kein vollständiges File-Listing ausgeben** – nur diff und PR-Link.
+
+---
+
+## Kanban Board – Gesamtübersicht der Statusübergänge
+
+```
+Backlog → [/new-story legt hier ab]
+Ready   → [manuell, wenn Story bereit zur Implementierung]
+In Progress → [implement-story: Schritt 1, nach Branch-Erstellung]
+In Review   → [implement-story: Schritt 6, nach PR-Erstellung]
+Done        → [automatisch durch GitHub Workflow wenn PR gemergt]
+```
 
 ---
 
@@ -169,3 +277,7 @@ Zeige dem Nutzer:
 | `flutter analyze` zeigt Fehler | Alle Fehler beheben, kein PR mit Analysefehlern |
 | Branch existiert bereits | Nutzer fragen ob fortgesetzt oder neu begonnen werden soll |
 | Merge-Konflikt | Nutzer informieren, gemeinsam lösen |
+| Abhängige Issue noch offen, kein Branch | Nutzer fragen: zuerst #X implementieren? |
+| Abhängige Issue im Review (offener PR) | Branch auf `feature/{andere-nr}-{slug}` basieren, PR-Body mit „Depends on #X" kennzeichnen |
+| Project-ID fehlt in CLAUDE.md | Kanban-Schritte überspringen, Nutzer einmalig anleiten IDs zu ermitteln |
+| `item-edit` schlägt fehl | Project-IDs in CLAUDE.md prüfen und aktualisieren |
