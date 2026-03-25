@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:checkme/l10n/app_localizations.dart';
@@ -7,11 +9,34 @@ import '../../../providers/config_provider.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../domain/entities/check_in_config.dart';
 
-class CheckInButton extends ConsumerWidget {
+class CheckInButton extends ConsumerStatefulWidget {
   const CheckInButton({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckInButton> createState() => _CheckInButtonState();
+}
+
+class _CheckInButtonState extends ConsumerState<CheckInButton> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild every 30 s so time-based transitions (ok → windowOpen/grace/overdue)
+    // are reflected without requiring a provider state change.
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final checkInState = ref.watch(checkInNotifierProvider);
     final configState = ref.watch(configNotifierProvider);
     final isLoading = checkInState.isLoading;
