@@ -21,6 +21,7 @@ Nimmt eine neue Anforderung auf, strukturiert sie als User Story und legt sie al
 
 - `gh` CLI installiert und authentifiziert (`gh auth status`)
 - GitHub Repository verbunden
+- GitHub Project (Kanban Board) angelegt (optional)
 
 ---
 
@@ -133,12 +134,47 @@ damit {Nutzen/Ziel}
 
 ---
 
+### Schritt 6 – Issue ins Kanban Board aufnehmen
+
+Prüfe ob GitHub Project-Daten in `CLAUDE.md` hinterlegt sind (Abschnitt „GitHub Project").
+
+**Falls Project-Nr bekannt:**
+```bash
+# Issue zum Board hinzufügen (landet automatisch in der ersten Spalte)
+gh project item-add {PROJECT_NR} \
+  --owner {github-username} \
+  --url {ISSUE_URL}
+```
+
+Das Issue landet damit automatisch im **Backlog** des Kanban Boards.
+
+**Falls Project-Nr unbekannt:**
+```bash
+gh project list --owner {github-username}
+```
+Project-Nr anzeigen, Nutzer fragen ob sie in `CLAUDE.md` gespeichert werden soll.
+
+---
+
 ## Ausgabe am Ende
 
 Zeige dem Nutzer:
 1. Issue-URL und Nummer (z.B. `#18`)
-2. Den fertigen Story-Text zur Referenz
-3. Hinweis: `Zum Implementieren: /implement-story #{nummer}`
+2. Kanban-Status: „Issue liegt im Backlog" (oder Hinweis falls Board nicht konfiguriert)
+3. Den fertigen Story-Text zur Referenz
+4. Hinweis: `Zum Implementieren: /implement-story #{nummer}`
+
+---
+
+## Kanban Board – Gesamtübersicht der Statusübergänge
+
+```
+Backlog     → [new-story legt hier ab]           ← dieser Skill
+Ready       → [manuell: Story ist bereit]
+In Progress → [implement-story: Branch erstellt]
+In Review   → [implement-story: PR erstellt]
+Done        → [automatisch: PR gemergt]
+```
 
 ---
 
@@ -161,3 +197,5 @@ Zeige dem Nutzer:
 | Milestone nicht gefunden | Neuen Milestone anlegen oder ohne zuweisen |
 | Label existiert nicht | Label anlegen (Schritt 3) |
 | Nutzer-Beschreibung zu vage | Nachfragen: „Was genau soll der Nutzer tun können?" |
+| Project-Nr unbekannt | `gh project list` ausführen, Nutzer fragen ob in CLAUDE.md speichern |
+| `item-add` schlägt fehl | Issue-URL prüfen, Project-Nr verifizieren |
