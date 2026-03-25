@@ -1,7 +1,7 @@
 {
   "@@locale": "de",
 
-  "appTitle": "CheckMe",
+  "appTitle": "My Daily OK",
   "tooltipContacts": "Kontakte",
   "tooltipSettings": "Einstellungen",
   "authError": "Auth-Fehler: {error}",
