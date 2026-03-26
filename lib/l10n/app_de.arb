@@ -38,7 +38,7 @@
     }
   },
   "lastCheckIn": "Letzter Check-in",
-  "nextDeadline": "Nächste Deadline",
+  "nextDeadline": "Nächster Check-in",
   "tomorrow": "morgen",
 
   "settingsTitle": "Einstellungen",
@@ -49,8 +49,8 @@
   "timeUnitSuffix": " Uhr",
   "checkInIntervalLabel": "Check-in Intervall",
   "hourUnit": "h",
-  "gracePeriodLabel": "Karenzzeit nach Deadline",
-  "preDeadlineLabel": "Check-in Fenster vor Deadline",
+  "gracePeriodLabel": "Karenzzeit nach Check-in",
+  "preDeadlineLabel": "Check-in Fenster vor Check-in",
   "minuteUnit": "min",
   "maxNotificationsLabel": "Max. Benachrichtigungen / Tag",
   "settingsSaved": "Einstellungen gespeichert",

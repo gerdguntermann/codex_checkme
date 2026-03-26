@@ -124,45 +124,53 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
   const recipientEmails = contacts.map((c) => c.email as string).filter(Boolean);
   if (recipientEmails.length === 0) return;
 
-  // Send emails via Resend
-  const resend = getResend();
-  const fromAddress = process.env.RESEND_FROM ?? "CheckMe <onboarding@resend.dev>";
-
   const now = new Date().toLocaleString("de-DE", {timeZone: "Europe/Berlin"});
 
-  await resend.emails.send({
-    from: fromAddress,
-    to: recipientEmails,
-    subject: "⚠️ CheckMe: Kein Check-in erfolgt",
-    html: `
-      <!DOCTYPE html>
-      <html lang="de">
-      <head><meta charset="UTF-8"></head>
-      <body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
-        <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <div style="background: #d32f2f; padding: 24px; text-align: center;">
-            <h1 style="color: #fff; margin: 0; font-size: 24px;">⚠️ CheckMe Alert</h1>
-          </div>
-          <div style="padding: 24px;">
-            <p style="font-size: 16px; color: #333; margin-top: 0;">
-              Die überwachte Person hat sich <strong>nicht innerhalb des erwarteten Zeitfensters</strong> eingecheckt.
-            </p>
-            <div style="background: #fff3e0; border-left: 4px solid #f57c00; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;">
-              <strong style="color: #e65100;">Bitte prüfe ihr Wohlbefinden.</strong>
-            </div>
-            <p style="color: #666; font-size: 14px;">Zeitpunkt der Benachrichtigung: ${now}</p>
-          </div>
-          <div style="background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999;">
-            Diese Nachricht wurde automatisch von <strong>CheckMe</strong> gesendet.
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
-  });
+  // In the local emulator, skip the real Resend call and just log the email
+  if (process.env.FUNCTIONS_EMULATOR === "true") {
+    functions.logger.info("[EMULATOR] Mock email – würde senden an:", {
+      to: recipientEmails,
+      subject: "⚠️ CheckMe: Kein Check-in erfolgt",
+      sentAt: now,
+    });
+  } else {
+    const resend = getResend();
+    const fromAddress = process.env.RESEND_FROM ?? "CheckMe <onboarding@resend.dev>";
 
-  functions.logger.info("Notification emails sent via Resend", {userId, recipients: recipientEmails});
+    await resend.emails.send({
+      from: fromAddress,
+      to: recipientEmails,
+      subject: "⚠️ CheckMe: Kein Check-in erfolgt",
+      html: `
+        <!DOCTYPE html>
+        <html lang="de">
+        <head><meta charset="UTF-8"></head>
+        <body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+          <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="background: #d32f2f; padding: 24px; text-align: center;">
+              <h1 style="color: #fff; margin: 0; font-size: 24px;">⚠️ CheckMe Alert</h1>
+            </div>
+            <div style="padding: 24px;">
+              <p style="font-size: 16px; color: #333; margin-top: 0;">
+                Die überwachte Person hat sich <strong>nicht innerhalb des erwarteten Zeitfensters</strong> eingecheckt.
+              </p>
+              <div style="background: #fff3e0; border-left: 4px solid #f57c00; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;">
+                <strong style="color: #e65100;">Bitte prüfe ihr Wohlbefinden.</strong>
+              </div>
+              <p style="color: #666; font-size: 14px;">Zeitpunkt der Benachrichtigung: ${now}</p>
+            </div>
+            <div style="background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999;">
+              Diese Nachricht wurde automatisch von <strong>CheckMe</strong> gesendet.
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
+    });
+  }
+
+  functions.logger.info("Notification emails sent", {userId, recipients: recipientEmails, emulator: process.env.FUNCTIONS_EMULATOR === "true"});
 
   // Log the notification
   await userRef.collection("notification_logs").add({
