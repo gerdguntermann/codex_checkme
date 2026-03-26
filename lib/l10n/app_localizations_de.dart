@@ -75,7 +75,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lastCheckIn => 'Letzter Check-in';
 
   @override
-  String get nextDeadline => 'Nächste Deadline';
+  String get nextDeadline => 'Nächster Check-in';
 
   @override
   String get tomorrow => 'morgen';
@@ -105,10 +105,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get hourUnit => 'h';
 
   @override
-  String get gracePeriodLabel => 'Karenzzeit nach Deadline';
+  String get gracePeriodLabel => 'Karenzzeit nach Check-in';
 
   @override
-  String get preDeadlineLabel => 'Check-in Fenster vor Deadline';
+  String get preDeadlineLabel => 'Check-in Fenster vor Check-in';
 
   @override
   String get minuteUnit => 'min';

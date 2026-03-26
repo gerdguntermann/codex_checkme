@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In de, this message translates to:
-  /// **'CheckMe'**
+  /// **'My Daily OK'**
   String get appTitle;
 
   /// No description provided for @tooltipContacts.
@@ -221,7 +221,7 @@ abstract class AppLocalizations {
   /// No description provided for @nextDeadline.
   ///
   /// In de, this message translates to:
-  /// **'Nächste Deadline'**
+  /// **'Nächster Check-in'**
   String get nextDeadline;
 
   /// No description provided for @tomorrow.
@@ -281,13 +281,13 @@ abstract class AppLocalizations {
   /// No description provided for @gracePeriodLabel.
   ///
   /// In de, this message translates to:
-  /// **'Karenzzeit nach Deadline'**
+  /// **'Karenzzeit nach Check-in'**
   String get gracePeriodLabel;
 
   /// No description provided for @preDeadlineLabel.
   ///
   /// In de, this message translates to:
-  /// **'Check-in Fenster vor Deadline'**
+  /// **'Check-in Fenster vor Check-in'**
   String get preDeadlineLabel;
 
   /// No description provided for @minuteUnit.
