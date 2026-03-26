@@ -18,6 +18,7 @@ import '../firebase_options.dart';
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
+    await AppLogger.initialize();
     log('task started: $taskName', name: 'BackgroundService');
     try {
       if (Firebase.apps.isEmpty) {
