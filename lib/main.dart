@@ -1,6 +1,7 @@
 import 'package:checkme/core/utils/app_logger.dart';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,11 @@ import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'presentation/providers/service_providers.dart';
 
+/// Auf `true` setzen um die Flutter-App gegen den lokalen Firebase Emulator zu verbinden.
+/// Starte den Emulator mit: `firebase emulators:start`
+/// Starte die App mit Emulator: `flutter run --dart-define=USE_EMULATOR=true`
+const bool kUseEmulator = bool.fromEnvironment('USE_EMULATOR');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLogger.initialize();
@@ -24,6 +30,13 @@ Future<void> main() async {
   log('Firebase initializing...', name: 'main');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   log('Firebase initialized', name: 'main');
+
+  if (kUseEmulator) {
+    log('Connecting to Firebase Emulator Suite...', name: 'main');
+    await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+    log('Emulator connected – Auth:9099, Firestore:8080', name: 'main');
+  }
 
   final auth = FirebaseAuth.instance;
   if (auth.currentUser == null) {
