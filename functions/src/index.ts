@@ -89,7 +89,9 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
   const config = configSnap.data()!;
   if (!config.isActive) return;
 
-  // Check maxNotifications guard – count notifications sent since the last check-in.
+  // Check maxNotifications guard – count ALL log entries (pending/sent/failed) since
+  // the last check-in. Counting pending entries prevents double-sends when parallel
+  // tasks fire before the first one finishes.
   // Using "since last check-in" instead of "since midnight" prevents repeated
   // nightly emails when the user is overdue across multiple days.
   const checkInsSnap = await userRef
@@ -104,7 +106,7 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
   const lastCheckInTimestamp = admin.firestore.Timestamp.fromMillis(lastCheckInMs);
   const logsSnap = await userRef
     .collection("notification_logs")
-    .where("sentAt", ">=", lastCheckInTimestamp)
+    .where("createdAt", ">=", lastCheckInTimestamp)
     .get();
 
   if (logsSnap.size >= (config.maxNotifications ?? 3)) {
@@ -125,6 +127,16 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
   if (recipientEmails.length === 0) return;
 
   const now = new Date().toLocaleString("de-DE", {timeZone: "Europe/Berlin"});
+  const createdAt = admin.firestore.Timestamp.now();
+
+  // Write pending log entry BEFORE sending – prevents double-sends when a second
+  // parallel task reads the log count before this function completes.
+  const logRef = await userRef.collection("notification_logs").add({
+    userId,
+    createdAt,
+    recipientEmails,
+    status: "pending",
+  });
 
   // In the local emulator, skip the real Resend call and just log the email
   if (process.env.FUNCTIONS_EMULATOR === "true") {
@@ -133,11 +145,15 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
       subject: "⚠️ CheckMe: Kein Check-in erfolgt",
       sentAt: now,
     });
-  } else {
-    const resend = getResend();
-    const fromAddress = process.env.RESEND_FROM ?? "CheckMe <onboarding@resend.dev>";
+    await logRef.update({status: "sent", sentAt: createdAt, emulator: true});
+    return;
+  }
 
-    await resend.emails.send({
+  const resend = getResend();
+  const fromAddress = process.env.RESEND_FROM ?? "CheckMe <onboarding@resend.dev>";
+
+  try {
+    const result = await resend.emails.send({
       from: fromAddress,
       to: recipientEmails,
       subject: "⚠️ CheckMe: Kein Check-in erfolgt",
@@ -168,14 +184,22 @@ async function sendOverdueNotifications(userId: string): Promise<void> {
       `,
       text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
     });
+
+    const messageId = result?.data?.id ?? null;
+    await logRef.update({
+      status: "sent",
+      sentAt: admin.firestore.Timestamp.now(),
+      resendMessageId: messageId,
+    });
+    functions.logger.info("Notification emails sent", {userId, recipients: recipientEmails, messageId});
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    await logRef.update({
+      status: "failed",
+      error: errorMessage,
+    });
+    functions.logger.error("Failed to send notification email", {userId, error: errorMessage});
+    // Re-throw so the Cloud Function is marked as failed and the trigger doc is NOT deleted
+    throw err;
   }
-
-  functions.logger.info("Notification emails sent", {userId, recipients: recipientEmails, emulator: process.env.FUNCTIONS_EMULATOR === "true"});
-
-  // Log the notification
-  await userRef.collection("notification_logs").add({
-    userId,
-    sentAt: admin.firestore.Timestamp.now(),
-    recipientEmails,
-  });
 }
