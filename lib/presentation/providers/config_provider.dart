@@ -18,15 +18,29 @@ class ConfigNotifier extends AsyncNotifier<CheckInConfig> {
   Future<void> saveConfig(CheckInConfig config) async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
+
+    final previous = state.valueOrNull;
+    final deadlineChanged = previous != null && _isDeadlineChanged(previous, config);
+
     state = AsyncData(config);
-    log('saveConfig – saving', name: 'ConfigNotifier');
+    log('saveConfig – saving (deadlineChanged=$deadlineChanged)', name: 'ConfigNotifier');
     try {
       await ref.read(configServiceProvider).saveConfig(userId, config);
+      if (deadlineChanged) {
+        log('saveConfig – deadline changed, performing implicit check-in', name: 'ConfigNotifier');
+        await ref.read(checkInServiceProvider).performCheckIn(userId);
+      }
     } catch (e, stack) {
       log('saveConfig – error: $e', name: 'ConfigNotifier');
       state = AsyncError(e, stack);
     }
   }
+
+  bool _isDeadlineChanged(CheckInConfig previous, CheckInConfig next) =>
+      previous.timingMode != next.timingMode ||
+      previous.checkInHour != next.checkInHour ||
+      previous.checkInMinute != next.checkInMinute ||
+      previous.intervalMinutes != next.intervalMinutes;
 }
 
 final configNotifierProvider =

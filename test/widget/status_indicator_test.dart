@@ -130,7 +130,7 @@ void main() {
       ));
       await tester.pump();
 
-      expect(find.text('Nächste Deadline: '), findsOneWidget);
+      expect(find.text('Nächster Check-in: '), findsOneWidget);
     });
   });
 
