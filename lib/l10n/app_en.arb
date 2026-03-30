@@ -17,6 +17,7 @@
   "statusOk": "OK",
   "statusWindowOpen": "WINDOW OPEN",
   "checkInRequired": "Check-in required!",
+  "overdueSinceLabel": "Overdue since",
   "graceMessage": "Check-in soon required",
   "allGood": "All good",
   "windowOpenMessage": "Check-in window open",

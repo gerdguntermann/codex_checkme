@@ -92,6 +92,18 @@ class TimeUtils {
   static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) =>
       getState(lastCheckIn, config) == CheckInState.overdue;
 
+  /// Returns the DateTime when the overdue state began (deadline + grace period).
+  /// Only meaningful when [getState] returns [CheckInState.overdue].
+  static DateTime overdueSince(DateTime lastCheckIn, CheckInConfig config) {
+    if (config.timingMode == TimingMode.interval) {
+      final deadline =
+          lastCheckIn.add(Duration(minutes: config.intervalMinutes));
+      return deadline.add(Duration(minutes: config.gracePeriodMinutes));
+    }
+    final prev = previousFixedDeadline(config);
+    return prev.add(Duration(minutes: config.gracePeriodMinutes));
+  }
+
   /// Returns duration remaining until the next deadline, or Duration.zero if past.
   static Duration timeUntilDeadline(DateTime lastCheckIn, CheckInConfig config) {
     final deadline = nextDeadline(lastCheckIn, config);

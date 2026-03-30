@@ -100,6 +100,11 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
               final windowStartStr =
                   DateFormat('HH:mm').format(windowStart);
 
+              final overdueSinceStr = state == CheckInState.overdue
+                  ? _formatDateTime(
+                      TimeUtils.overdueSince(lastCheckIn.timestamp, config))
+                  : null;
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -109,6 +114,13 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     label: statusLabel,
                     value: statusValue,
                   ),
+                  if (overdueSinceStr != null)
+                    _StatusRow(
+                      icon: Icons.alarm_on,
+                      color: Colors.red,
+                      label: l10n.overdueSinceLabel,
+                      value: overdueSinceStr,
+                    ),
                   const Divider(),
                   _StatusRow(
                     icon: Icons.access_time,
@@ -146,6 +158,15 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
       ),
     );
   }
+}
+
+String _formatDateTime(DateTime dt) {
+  final now = DateTime.now();
+  final isToday =
+      dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  return isToday
+      ? DateFormat('HH:mm').format(dt)
+      : DateFormat('dd.MM.yyyy HH:mm').format(dt);
 }
 
 String _formatDeadline(

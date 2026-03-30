@@ -220,4 +220,36 @@ void main() {
       expect(remaining, Duration.zero);
     });
   });
+
+  group('TimeUtils.overdueSince', () {
+    test('interval mode: deadline + gracePeriod', () {
+      final last = DateTime.now().subtract(const Duration(hours: 2));
+      final cfg = intervalCfg(intervalMinutes: 60, gracePeriodMinutes: 15);
+      final since = TimeUtils.overdueSince(last, cfg);
+      final expected = last
+          .add(const Duration(minutes: 60))
+          .add(const Duration(minutes: 15));
+      expect(since, expected);
+    });
+
+    test('fixedTime mode: previousDeadline + gracePeriod', () {
+      final now = DateTime.now();
+      // Deadline was 2 hours ago, grace 10 min → overdue since 1h50m ago
+      final deadlineHour = now.subtract(const Duration(hours: 2)).hour;
+      final cfg = CheckInConfig(
+        timingMode: TimingMode.fixedTime,
+        checkInHour: deadlineHour,
+        checkInMinute: now.subtract(const Duration(hours: 2)).minute,
+        intervalMinutes: 240,
+        gracePeriodMinutes: 10,
+        preDeadlineMinutes: 0,
+        maxNotifications: 3,
+        isActive: true,
+      );
+      final prev = TimeUtils.previousFixedDeadline(cfg);
+      final since = TimeUtils.overdueSince(
+          DateTime.now().subtract(const Duration(days: 1)), cfg);
+      expect(since, prev.add(const Duration(minutes: 10)));
+    });
+  });
 }

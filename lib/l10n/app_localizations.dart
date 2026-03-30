@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'Check-in erforderlich!'**
   String get checkInRequired;
 
+  /// No description provided for @overdueSinceLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Überfällig seit'**
+  String get overdueSinceLabel;
+
   /// No description provided for @graceMessage.
   ///
   /// In de, this message translates to:

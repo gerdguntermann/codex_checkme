@@ -55,6 +55,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkInRequired => 'Check-in required!';
 
   @override
+  String get overdueSinceLabel => 'Overdue since';
+
+  @override
   String get graceMessage => 'Check-in soon required';
 
   @override
