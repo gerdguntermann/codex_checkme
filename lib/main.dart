@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'background/background_service.dart';
 import 'core/constants/app_constants.dart';
+import 'data/notification_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -53,11 +54,19 @@ Future<void> main() async {
   await BackgroundService.registerPeriodicTask();
   log('Background service registered', name: 'main');
 
+  await NotificationService.initialize();
+  log('NotificationService initialized', name: 'main');
+
   if (Platform.isAndroid) {
-    final status = await Permission.ignoreBatteryOptimizations.status;
-    if (!status.isGranted) {
+    final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+    if (!batteryStatus.isGranted) {
       log('Requesting battery optimization exemption', name: 'main');
       await Permission.ignoreBatteryOptimizations.request();
+    }
+    final notifStatus = await Permission.notification.status;
+    if (!notifStatus.isGranted) {
+      log('Requesting notification permission', name: 'main');
+      await Permission.notification.request();
     }
   }
 
