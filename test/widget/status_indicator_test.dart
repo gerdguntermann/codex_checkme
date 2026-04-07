@@ -1,3 +1,5 @@
+// Note: Tests that create windows relative to DateTime.now() may produce
+// unexpected results within 2h of midnight (day-boundary edge cases).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:checkme/domain/entities/check_in_config.dart';
@@ -7,7 +9,7 @@ import 'package:checkme/presentation/providers/check_in_provider.dart';
 import 'package:checkme/presentation/providers/config_provider.dart';
 import 'helpers.dart';
 
-// ── Fake notifiers (must extend the concrete provider notifier type) ───────────
+// ── Fake notifiers ─────────────────────────────────────────────────────────
 
 class _FakeCheckInNotifier extends CheckInNotifier {
   final CheckInRecord? _record;
@@ -23,24 +25,14 @@ class _FakeConfigNotifier extends ConfigNotifier {
   Future<CheckInConfig> build() async => _config;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-List<Override> _overrides({CheckInRecord? record, required CheckInConfig config}) => [
+List<Override> _overrides(
+        {CheckInRecord? record, required CheckInConfig config}) =>
+    [
       checkInNotifierProvider.overrideWith(() => _FakeCheckInNotifier(record)),
       configNotifierProvider.overrideWith(() => _FakeConfigNotifier(config)),
     ];
-
-CheckInConfig _intervalCfg({
-  int intervalMinutes = 60,
-  int gracePeriodMinutes = 10,
-  int preDeadlineMinutes = 0,
-}) =>
-    CheckInConfig.defaults().copyWith(
-      timingMode: TimingMode.interval,
-      intervalMinutes: intervalMinutes,
-      gracePeriodMinutes: gracePeriodMinutes,
-      preDeadlineMinutes: preDeadlineMinutes,
-    );
 
 CheckInRecord _record(Duration ago) => CheckInRecord(
       id: 'r1',
@@ -48,7 +40,45 @@ CheckInRecord _record(Duration ago) => CheckInRecord(
       timestamp: DateTime.now().subtract(ago),
     );
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+/// Window that started [startMinsAgo] minutes ago, ends [endMinsFromNow] from now.
+CheckInConfig _openWindowCfg(
+    {int startMinsAgo = 30, int endMinsFromNow = 30}) {
+  final now = DateTime.now();
+  final s = now.subtract(Duration(minutes: startMinsAgo));
+  final e = now.add(Duration(minutes: endMinsFromNow));
+  return CheckInConfig(
+    windows: [
+      CheckInWindow(
+          startHour: s.hour,
+          startMinute: s.minute,
+          endHour: e.hour,
+          endMinute: e.minute),
+    ],
+    maxNotifications: 3,
+    isActive: true,
+  );
+}
+
+/// Window that started [startMinsAgo] minutes ago, ended [endMinsAgo] ago.
+CheckInConfig _closedWindowCfg(
+    {int startMinsAgo = 70, int endMinsAgo = 10}) {
+  final now = DateTime.now();
+  final s = now.subtract(Duration(minutes: startMinsAgo));
+  final e = now.subtract(Duration(minutes: endMinsAgo));
+  return CheckInConfig(
+    windows: [
+      CheckInWindow(
+          startHour: s.hour,
+          startMinute: s.minute,
+          endHour: e.hour,
+          endMinute: e.minute),
+    ],
+    maxNotifications: 3,
+    isActive: true,
+  );
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
 
 void main() {
   group('StatusIndicator – no check-in', () {
@@ -63,55 +93,14 @@ void main() {
     });
   });
 
-  group('StatusIndicator – interval mode', () {
-    testWidgets('OK state: shows "OK" and "Alles gut"', (tester) async {
+  group('StatusIndicator – window open', () {
+    testWidgets('shows FENSTER OFFEN when window is open and no check-in done',
+        (tester) async {
       await tester.pumpWidget(buildTestApp(
         const StatusIndicator(),
         overrides: _overrides(
-          record: _record(const Duration(minutes: 10)),
-          config: _intervalCfg(),
-        ),
-      ));
-      await tester.pump();
-
-      expect(find.text('OK: '), findsOneWidget);
-      expect(find.text('Alles gut'), findsOneWidget);
-    });
-
-    testWidgets('grace state: shows "KARENZZEIT"', (tester) async {
-      await tester.pumpWidget(buildTestApp(
-        const StatusIndicator(),
-        overrides: _overrides(
-          record: _record(const Duration(minutes: 65)),
-          config: _intervalCfg(),
-        ),
-      ));
-      await tester.pump();
-
-      expect(find.text('KARENZZEIT: '), findsOneWidget);
-      expect(find.text('Check-in bald erforderlich'), findsOneWidget);
-    });
-
-    testWidgets('overdue state: shows "ÜBERFÄLLIG"', (tester) async {
-      await tester.pumpWidget(buildTestApp(
-        const StatusIndicator(),
-        overrides: _overrides(
-          record: _record(const Duration(minutes: 75)),
-          config: _intervalCfg(),
-        ),
-      ));
-      await tester.pump();
-
-      expect(find.text('ÜBERFÄLLIG: '), findsOneWidget);
-      expect(find.text('Check-in erforderlich!'), findsOneWidget);
-    });
-
-    testWidgets('windowOpen state: shows "FENSTER OFFEN"', (tester) async {
-      await tester.pumpWidget(buildTestApp(
-        const StatusIndicator(),
-        overrides: _overrides(
-          record: _record(const Duration(minutes: 50)),
-          config: _intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20),
+          record: _record(const Duration(hours: 25)), // old check-in
+          config: _openWindowCfg(),
         ),
       ));
       await tester.pump();
@@ -120,21 +109,53 @@ void main() {
       expect(find.text('Check-in Fenster offen'), findsOneWidget);
     });
 
-    testWidgets('shows next deadline label', (tester) async {
+    testWidgets('shows "Fenster endet:" label during open window',
+        (tester) async {
       await tester.pumpWidget(buildTestApp(
         const StatusIndicator(),
         overrides: _overrides(
-          record: _record(const Duration(minutes: 10)),
-          config: _intervalCfg(),
+          record: _record(const Duration(hours: 25)),
+          config: _openWindowCfg(),
         ),
       ));
       await tester.pump();
 
-      expect(find.text('Nächster Check-in: '), findsOneWidget);
+      expect(find.text('Fenster endet: '), findsOneWidget);
     });
   });
 
-  group('StatusIndicator – fixedTime mode', () {
+  group('StatusIndicator – ok state', () {
+    testWidgets('shows OK and Alles gut after check-in during open window',
+        (tester) async {
+      final cfg = _openWindowCfg(startMinsAgo: 30, endMinsFromNow: 30);
+      // Checked in 10 min ago = within the window
+      await tester.pumpWidget(buildTestApp(
+        const StatusIndicator(),
+        overrides: _overrides(
+          record: _record(const Duration(minutes: 10)),
+          config: cfg,
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('OK: '), findsOneWidget);
+      expect(find.text('Alles gut'), findsOneWidget);
+    });
+
+    testWidgets('shows "Nächstes Fenster:" label in OK state', (tester) async {
+      final cfg = _openWindowCfg(startMinsAgo: 30, endMinsFromNow: 30);
+      await tester.pumpWidget(buildTestApp(
+        const StatusIndicator(),
+        overrides: _overrides(
+          record: _record(const Duration(minutes: 10)),
+          config: cfg,
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Nächstes Fenster: '), findsOneWidget);
+    });
+
     testWidgets('shows last check-in label', (tester) async {
       await tester.pumpWidget(buildTestApp(
         const StatusIndicator(),
@@ -146,6 +167,36 @@ void main() {
       await tester.pump();
 
       expect(find.text('Letzter Check-in: '), findsOneWidget);
+    });
+  });
+
+  group('StatusIndicator – overdue state', () {
+    testWidgets('shows ÜBERFÄLLIG when window closed and no check-in',
+        (tester) async {
+      await tester.pumpWidget(buildTestApp(
+        const StatusIndicator(),
+        overrides: _overrides(
+          record: _record(const Duration(hours: 25)),
+          config: _closedWindowCfg(),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('ÜBERFÄLLIG: '), findsOneWidget);
+      expect(find.text('Check-in erforderlich!'), findsOneWidget);
+    });
+
+    testWidgets('shows "Nächstes Fenster:" label when overdue', (tester) async {
+      await tester.pumpWidget(buildTestApp(
+        const StatusIndicator(),
+        overrides: _overrides(
+          record: _record(const Duration(hours: 25)),
+          config: _closedWindowCfg(),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Nächstes Fenster: '), findsOneWidget);
     });
   });
 }

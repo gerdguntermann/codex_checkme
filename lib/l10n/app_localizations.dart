@@ -326,6 +326,36 @@ abstract class AppLocalizations {
   /// **'Alle Benachrichtigungen ein-/ausschalten'**
   String get monitoringSubtitle;
 
+  /// No description provided for @windowStartLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Fenster öffnet'**
+  String get windowStartLabel;
+
+  /// No description provided for @windowEndLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Fenster schließt'**
+  String get windowEndLabel;
+
+  /// No description provided for @addWindow.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweites Zeitfenster hinzufügen'**
+  String get addWindow;
+
+  /// No description provided for @windowEndsAtLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Fenster endet'**
+  String get windowEndsAtLabel;
+
+  /// No description provided for @nextWindowLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Nächstes Fenster'**
+  String get nextWindowLabel;
+
   /// No description provided for @contactsTitle.
   ///
   /// In de, this message translates to:

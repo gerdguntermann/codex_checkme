@@ -129,6 +129,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get monitoringSubtitle => 'Alle Benachrichtigungen ein-/ausschalten';
 
   @override
+  String get windowStartLabel => 'Fenster öffnet';
+
+  @override
+  String get windowEndLabel => 'Fenster schließt';
+
+  @override
+  String get addWindow => 'Zweites Zeitfenster hinzufügen';
+
+  @override
+  String get windowEndsAtLabel => 'Fenster endet';
+
+  @override
+  String get nextWindowLabel => 'Nächstes Fenster';
+
+  @override
   String get contactsTitle => 'Kontakte';
 
   @override

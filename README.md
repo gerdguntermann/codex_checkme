@@ -1,16 +1,52 @@
-# checkme
+# CheckMe
 
-A new Flutter project.
+CheckMe is a Flutter app for health monitoring through recurring user check-ins.
 
-## Getting Started
+If a user misses a configured deadline, the app triggers Firebase-based notification flow so emergency contacts can be informed by email.
 
-This project is a starting point for a Flutter application.
+## Features
 
-A few resources to get you started if this is your first Flutter project:
+- Manual check-in flow
+- Fixed-time and interval-based reminder modes
+- Configurable grace period
+- Emergency contact management
+- Firebase-backed persistence
+- Android background overdue detection
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Stack
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter / Dart
+- Riverpod
+- GoRouter
+- Firebase Auth, Firestore, Cloud Functions
+- Resend for email delivery
+- Workmanager on Android
+
+## Project Notes
+
+- Primary package: `de.mydigits.checkme`
+- Primary target: Android
+- Codex project instructions live in `AGENTS.md`
+- Legacy Claude-specific files are still present but are no longer the primary instruction source
+
+## Setup
+
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter run
+```
+
+## Tests
+
+```bash
+flutter test test/
+flutter test integration_test/
+```
+
+## Firebase
+
+You need environment-specific Firebase configuration and function secrets:
+
+- `lib/firebase_options.dart`
+- `functions/.env` with `RESEND_API_KEY`

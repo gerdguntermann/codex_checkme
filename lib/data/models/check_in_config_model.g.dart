@@ -6,26 +6,38 @@ part of 'check_in_config_model.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+CheckInWindowModel _$CheckInWindowModelFromJson(Map<String, dynamic> json) =>
+    CheckInWindowModel(
+      startHour: (json['startHour'] as num).toInt(),
+      startMinute: (json['startMinute'] as num).toInt(),
+      endHour: (json['endHour'] as num).toInt(),
+      endMinute: (json['endMinute'] as num).toInt(),
+    );
+
+Map<String, dynamic> _$CheckInWindowModelToJson(CheckInWindowModel instance) =>
+    <String, dynamic>{
+      'startHour': instance.startHour,
+      'startMinute': instance.startMinute,
+      'endHour': instance.endHour,
+      'endMinute': instance.endMinute,
+    };
+
 CheckInConfigModel _$CheckInConfigModelFromJson(Map<String, dynamic> json) =>
     CheckInConfigModel(
-      timingMode: json['timingMode'] as String? ?? 'fixedTime',
-      checkInHour: (json['checkInHour'] as num?)?.toInt() ?? 9,
-      checkInMinute: (json['checkInMinute'] as num?)?.toInt() ?? 0,
-      intervalMinutes: (json['intervalMinutes'] as num?)?.toInt() ?? 240,
-      gracePeriodMinutes: (json['gracePeriodMinutes'] as num).toInt(),
-      preDeadlineMinutes: (json['preDeadlineMinutes'] as num?)?.toInt() ?? 60,
+      windows:
+          (json['windows'] as List<dynamic>?)
+              ?.map(
+                (e) => CheckInWindowModel.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
       maxNotifications: (json['maxNotifications'] as num).toInt(),
       isActive: json['isActive'] as bool,
     );
 
 Map<String, dynamic> _$CheckInConfigModelToJson(CheckInConfigModel instance) =>
     <String, dynamic>{
-      'timingMode': instance.timingMode,
-      'checkInHour': instance.checkInHour,
-      'checkInMinute': instance.checkInMinute,
-      'intervalMinutes': instance.intervalMinutes,
-      'gracePeriodMinutes': instance.gracePeriodMinutes,
-      'preDeadlineMinutes': instance.preDeadlineMinutes,
+      'windows': instance.windows.map((e) => e.toJson()).toList(),
       'maxNotifications': instance.maxNotifications,
       'isActive': instance.isActive,
     };

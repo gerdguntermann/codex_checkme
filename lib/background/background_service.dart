@@ -2,11 +2,12 @@ import 'dart:async';
 import 'package:checkme/core/utils/app_logger.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/firestore_constants.dart';
@@ -16,6 +17,12 @@ import '../data/config_service.dart';
 import '../data/notification_service.dart';
 import '../domain/entities/check_in_config.dart';
 import '../firebase_options.dart';
+
+/// Same flag as [main.dart] – must match so background isolates talk to emulators.
+const bool kUseEmulator = bool.fromEnvironment('USE_EMULATOR');
+
+bool get _isAndroid =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -29,22 +36,46 @@ void callbackDispatcher() {
         await Firebase.initializeApp(
             options: DefaultFirebaseOptions.currentPlatform);
       }
+      if (kUseEmulator) {
+        await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+        FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+        log('background: using Firebase emulators', name: 'BackgroundService');
+      }
+
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        log('background: waiting for auth session…', name: 'BackgroundService');
+        try {
+          user = await FirebaseAuth.instance
+              .authStateChanges()
+              .where((u) => u != null)
+              .map((u) => u!)
+              .first
+              .timeout(const Duration(seconds: 15));
+        } on TimeoutException {
+          log('background: auth timeout – aborting', name: 'BackgroundService');
+          return false;
+        }
+      }
+      if (user == null) {
+        log('background: no authenticated user – aborting',
+            name: 'BackgroundService');
+        return false;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final firestore = FirebaseFirestore.instance;
 
-      final userId = prefs.getString(AppConstants.userIdKey);
-      if (userId == null) {
-        log('no userId in prefs – aborting', name: 'BackgroundService');
-        return true;
+      final userId = user.uid;
+      final prefsUserId = prefs.getString(AppConstants.userIdKey);
+      if (prefsUserId != userId) {
+        await prefs.setString(AppConstants.userIdKey, userId);
       }
       log('running for uid=$userId', name: 'BackgroundService');
 
       final configService = ConfigService(firestore, prefs);
       final config = await configService.getConfig(userId);
-      log(
-          'config: active=${config.isActive}, '
-          'checkIn=${config.checkInHour}:${config.checkInMinute.toString().padLeft(2, '0')}, '
-          'grace=${config.gracePeriodMinutes}min',
+      log('config: active=${config.isActive}, windows=${config.windows.length}',
           name: 'BackgroundService');
 
       final checkInService = CheckInService(firestore, const Uuid());
@@ -54,8 +85,7 @@ void callbackDispatcher() {
 
       final state = TimeUtils.getState(lastCheckIn?.timestamp, config);
       final isOverdue = state == CheckInState.overdue;
-      log('state: $state', name: 'BackgroundService');
-
+      log('state: ${state.name}', name: 'BackgroundService');
       final now = DateTime.now();
 
       // ── Background log ──────────────────────────────────────────────────────
@@ -74,7 +104,7 @@ void callbackDispatcher() {
         'isOverdue': isOverdue,
       });
 
-      // Rotate: delete all log entries older than the retention threshold.
+      // Rotate old log entries.
       final cutoff = now.subtract(
           const Duration(days: FirestoreConstants.backgroundLogRetentionDays));
       final oldLogs = await logsRef
@@ -82,9 +112,7 @@ void callbackDispatcher() {
           .get();
       if (oldLogs.docs.isNotEmpty) {
         final batch = firestore.batch();
-        for (final doc in oldLogs.docs) {
-          batch.delete(doc.reference);
-        }
+        for (final doc in oldLogs.docs) batch.delete(doc.reference);
         await batch.commit();
         log('deleted ${oldLogs.docs.length} old background_log entries',
             name: 'BackgroundService');
@@ -94,15 +122,36 @@ void callbackDispatcher() {
         log('monitoring inactive – done', name: 'BackgroundService');
         return true;
       }
+
+      // ── State-based notifications ────────────────────────────────────────────
+      // Each window triggers at most one notification per type.  The window-start
+      // ISO string serves as the deduplication key.
+      final windowKey = TimeUtils.currentWindowStart(config)?.toIso8601String();
+      if (windowKey != null) {
+        switch (state) {
+          case CheckInState.windowOpen:
+            if (prefs.getString(AppConstants.notifKeyWindowOpen) != windowKey) {
+              await NotificationService.showWindowOpen();
+              await prefs.setString(AppConstants.notifKeyWindowOpen, windowKey);
+              log('Notification: windowOpen', name: 'BackgroundService');
+            }
+          case CheckInState.overdue:
+            if (prefs.getString(AppConstants.notifKeyOverdue) != windowKey) {
+              await NotificationService.showOverdue();
+              await prefs.setString(AppConstants.notifKeyOverdue, windowKey);
+              log('Notification: overdue', name: 'BackgroundService');
+            }
+          case CheckInState.ok:
+            break;
+        }
+      }
+
       if (lastCheckIn == null) {
         log('no check-in yet – done', name: 'BackgroundService');
         return true;
       }
 
-      // ── State-based notifications ───────────────────────────────────────────
-      await _handleStateNotifications(state, lastCheckIn.timestamp, config, prefs);
-
-      // ── Overdue trigger ─────────────────────────────────────────────────────
+      // ── Overdue trigger → triggers Cloud Function → sends emails ────────────
       if (isOverdue) {
         log('OVERDUE – writing overdue_trigger', name: 'BackgroundService');
         await firestore.collection('overdue_triggers').add({
@@ -112,12 +161,13 @@ void callbackDispatcher() {
         log('overdue_trigger written', name: 'BackgroundService');
       }
 
-      // ── Email-sent notifications ────────────────────────────────────────────
+      // ── Show notification for each newly sent email ──────────────────────────
       await _handleEmailNotifications(firestore, userId, prefs, now);
 
       return true;
     } catch (e, stack) {
-      log('task error: $e', name: 'BackgroundService', error: e, stackTrace: stack);
+      log('task error: $e',
+          name: 'BackgroundService', error: e, stackTrace: stack);
       try {
         final prefs = await SharedPreferences.getInstance();
         final userId = prefs.getString(AppConstants.userIdKey);
@@ -137,62 +187,6 @@ void callbackDispatcher() {
   });
 }
 
-/// Shows the appropriate local notification when the state has changed since
-/// the last run.  Uses the cycle-deadline as a deduplication key so that each
-/// transition fires at most one notification.
-Future<void> _handleStateNotifications(
-  CheckInState state,
-  DateTime lastCheckInTimestamp,
-  CheckInConfig config,
-  SharedPreferences prefs,
-) async {
-  final deadlineKey = _cycleDeadlineKey(state, lastCheckInTimestamp, config);
-  log('state=$state, deadlineKey=$deadlineKey', name: 'BackgroundService');
-
-  switch (state) {
-    case CheckInState.windowOpen:
-      if (prefs.getString(AppConstants.notifKeyWindowOpen) != deadlineKey) {
-        await NotificationService.showWindowOpen();
-        await prefs.setString(AppConstants.notifKeyWindowOpen, deadlineKey);
-      }
-    case CheckInState.grace:
-      if (prefs.getString(AppConstants.notifKeyGrace) != deadlineKey) {
-        await NotificationService.showGrace();
-        await prefs.setString(AppConstants.notifKeyGrace, deadlineKey);
-      }
-    case CheckInState.overdue:
-      if (prefs.getString(AppConstants.notifKeyOverdue) != deadlineKey) {
-        await NotificationService.showOverdue();
-        await prefs.setString(AppConstants.notifKeyOverdue, deadlineKey);
-      }
-    case CheckInState.ok:
-      break; // no notification needed
-  }
-}
-
-/// Returns an ISO-8601 string that uniquely identifies the current check-in
-/// cycle for the given state, used as a notification deduplication key.
-String _cycleDeadlineKey(
-  CheckInState state,
-  DateTime lastCheckIn,
-  CheckInConfig config,
-) {
-  final DateTime deadline;
-  if (state == CheckInState.windowOpen) {
-    // Approaching deadline.
-    deadline = TimeUtils.nextDeadline(lastCheckIn, config);
-  } else if (config.timingMode == TimingMode.interval) {
-    // Missed deadline in interval mode.
-    deadline = lastCheckIn.add(Duration(minutes: config.intervalMinutes));
-  } else {
-    // Missed deadline in fixedTime mode.
-    deadline = TimeUtils.previousFixedDeadline(config);
-  }
-  return deadline.toIso8601String();
-}
-
-/// Queries [notification_logs] for newly confirmed email sends and shows a
-/// local notification for each one, preventing duplicates via SharedPreferences.
 Future<void> _handleEmailNotifications(
   FirebaseFirestore firestore,
   String userId,
@@ -211,9 +205,8 @@ Future<void> _handleEmailNotifications(
       .where('createdAt', isGreaterThan: Timestamp.fromDate(lastCheck))
       .get();
 
-  final sentLogs = logsSnap.docs
-      .where((d) => d.data()['status'] == 'sent')
-      .toList();
+  final sentLogs =
+      logsSnap.docs.where((d) => d.data()['status'] == 'sent').toList();
 
   log('email notification check: ${sentLogs.length} new sent log(s)',
       name: 'BackgroundService');
@@ -224,29 +217,39 @@ Future<void> _handleEmailNotifications(
     await NotificationService.showEmailSent(recipients);
   }
 
-  // Advance the watermark so we don't re-process these logs.
-  await prefs.setString(AppConstants.notifKeyLastEmailCheck, now.toIso8601String());
+  await prefs.setString(
+      AppConstants.notifKeyLastEmailCheck, now.toIso8601String());
 }
 
 class BackgroundService {
   static Future<void> initialize() async {
-    if (kIsWeb) return;
+    if (!_isAndroid) return;
     await Workmanager().initialize(callbackDispatcher);
   }
 
-  static Future<void> registerPeriodicTask() async {
-    if (kIsWeb) return;
+  /// Registers (or re-registers) the periodic monitoring task.
+  ///
+  /// [config] is used to compute the [initialDelay] so the first run
+  /// happens approximately when the next window opens, avoiding unnecessary
+  /// wake-ups in the middle of the night.
+  static Future<void> registerNextWindow(CheckInConfig config) async {
+    if (!_isAndroid) return;
+    await Workmanager().cancelAll();
+    final delay = TimeUtils.timeUntilNextWindowStart(config);
+    log('BackgroundService: registering task, next window in ${delay.inMinutes} min',
+        name: 'BackgroundService');
     await Workmanager().registerPeriodicTask(
       AppConstants.backgroundTaskName,
       AppConstants.backgroundTaskName,
       tag: AppConstants.backgroundTaskTag,
-      frequency: const Duration(seconds: 900),
+      frequency: const Duration(minutes: 15),
+      initialDelay: delay,
       constraints: Constraints(networkType: NetworkType.connected),
     );
   }
 
   static Future<void> cancelAll() async {
-    if (kIsWeb) return;
+    if (!_isAndroid) return;
     await Workmanager().cancelAll();
   }
 }

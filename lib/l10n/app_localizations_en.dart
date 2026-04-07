@@ -129,6 +129,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get monitoringSubtitle => 'Toggle all notifications on/off';
 
   @override
+  String get windowStartLabel => 'Window opens';
+
+  @override
+  String get windowEndLabel => 'Window closes';
+
+  @override
+  String get addWindow => 'Add second time window';
+
+  @override
+  String get windowEndsAtLabel => 'Window ends';
+
+  @override
+  String get nextWindowLabel => 'Next window';
+
+  @override
   String get contactsTitle => 'Contacts';
 
   @override

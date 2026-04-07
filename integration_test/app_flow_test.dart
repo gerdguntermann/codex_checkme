@@ -146,23 +146,48 @@ void main() {
         userId: 'test-uid',
         timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
       );
-      await tester.pumpWidget(_buildTestApp(lastCheckIn: record));
+      // Window opened 30 min ago, ends in 30 min – checked in 5 min ago → ok
+      final now = DateTime.now();
+      final start = now.subtract(const Duration(minutes: 30));
+      final end = now.add(const Duration(minutes: 30));
+      final cfg = CheckInConfig(
+        windows: [
+          CheckInWindow(
+              startHour: start.hour,
+              startMinute: start.minute,
+              endHour: end.hour,
+              endMinute: end.minute),
+        ],
+        maxNotifications: 3,
+        isActive: true,
+      );
+      await tester.pumpWidget(_buildTestApp(lastCheckIn: record, config: cfg));
       await tester.pumpAndSettle();
 
       expect(find.text('OK: '), findsOneWidget);
       expect(find.text('Alles gut'), findsOneWidget);
     });
 
-    testWidgets('overdue check-in shows ÜBERFÄLLIG status', (tester) async {
+    testWidgets('overdue state shows ÜBERFÄLLIG status', (tester) async {
       final record = CheckInRecord(
         id: 'r1',
         userId: 'test-uid',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 75)),
+        timestamp: DateTime.now().subtract(const Duration(hours: 25)),
       );
-      final cfg = CheckInConfig.defaults().copyWith(
-        timingMode: TimingMode.interval,
-        intervalMinutes: 60,
-        gracePeriodMinutes: 10,
+      // Closed window: started 70 min ago, ended 10 min ago
+      final now = DateTime.now();
+      final start = now.subtract(const Duration(minutes: 70));
+      final end = now.subtract(const Duration(minutes: 10));
+      final cfg = CheckInConfig(
+        windows: [
+          CheckInWindow(
+              startHour: start.hour,
+              startMinute: start.minute,
+              endHour: end.hour,
+              endMinute: end.minute),
+        ],
+        maxNotifications: 3,
+        isActive: true,
       );
       await tester.pumpWidget(_buildTestApp(lastCheckIn: record, config: cfg));
       await tester.pumpAndSettle();
@@ -206,29 +231,26 @@ void main() {
     });
   });
 
-  group('Config page – mode switching', () {
-    testWidgets('can switch to interval mode', (tester) async {
+  group('Config page – window configuration', () {
+    testWidgets('shows window time pickers', (tester) async {
       await tester.pumpWidget(_buildTestApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.settings));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Intervall'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Check-in Intervall'), findsOneWidget);
-      expect(find.text('Tägliche Check-in Zeit'), findsNothing);
+      expect(find.text('Fenster öffnet'), findsOneWidget);
+      expect(find.text('Fenster schließt'), findsOneWidget);
     });
 
-    testWidgets('switching mode enables save button', (tester) async {
+    testWidgets('add window button enables save button', (tester) async {
       await tester.pumpWidget(_buildTestApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.settings));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Intervall'));
+      await tester.tap(find.text('Zweites Zeitfenster hinzufügen'));
       await tester.pumpAndSettle();
 
       final saveBtn = tester.widget<IconButton>(

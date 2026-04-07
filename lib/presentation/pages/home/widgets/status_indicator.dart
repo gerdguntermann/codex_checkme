@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../../../providers/check_in_provider.dart';
 import '../../../providers/config_provider.dart';
 import '../../../../core/utils/time_utils.dart';
-import '../../../../domain/entities/check_in_config.dart';
 
 class StatusIndicator extends ConsumerStatefulWidget {
   const StatusIndicator({super.key});
@@ -22,7 +21,7 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
   @override
   void initState() {
     super.initState();
-    // Rebuild every 30 s so grace/overdue transitions appear without interaction.
+    // Rebuild every 30 s so windowOpen/overdue transitions appear without interaction.
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
@@ -62,11 +61,8 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
             final timeStr = formatter.format(lastCheckIn.timestamp);
 
             if (config != null) {
-              final state =
-                  TimeUtils.getState(lastCheckIn.timestamp, config);
-              final deadline =
-                  TimeUtils.nextDeadline(lastCheckIn.timestamp, config);
-              final deadlineStr = _formatDeadline(deadline, config, l10n);
+              final state = TimeUtils.getState(lastCheckIn.timestamp, config);
+              final timeFormat = DateFormat('HH:mm');
 
               final (icon, color, statusLabel, statusValue) = switch (state) {
                 CheckInState.ok => (
@@ -81,12 +77,6 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     l10n.statusWindowOpen,
                     l10n.windowOpenMessage,
                   ),
-                CheckInState.grace => (
-                    Icons.warning_amber,
-                    Colors.orange,
-                    l10n.statusGrace,
-                    l10n.graceMessage,
-                  ),
                 CheckInState.overdue => (
                     Icons.warning,
                     Colors.red,
@@ -95,15 +85,8 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                   ),
               };
 
-              final windowStart =
-                  TimeUtils.checkInWindowStart(lastCheckIn.timestamp, config);
-              final windowStartStr =
-                  DateFormat('HH:mm').format(windowStart);
-
-              final overdueSinceStr = state == CheckInState.overdue
-                  ? _formatDateTime(
-                      TimeUtils.overdueSince(lastCheckIn.timestamp, config))
-                  : null;
+              final windowEnd = TimeUtils.currentWindowEnd(config);
+              final nextStart = TimeUtils.nextWindowStart(config);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,13 +97,6 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     label: statusLabel,
                     value: statusValue,
                   ),
-                  if (overdueSinceStr != null)
-                    _StatusRow(
-                      icon: Icons.alarm_on,
-                      color: Colors.red,
-                      label: l10n.overdueSinceLabel,
-                      value: overdueSinceStr,
-                    ),
                   const Divider(),
                   _StatusRow(
                     icon: Icons.access_time,
@@ -128,20 +104,19 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
                     label: l10n.lastCheckIn,
                     value: timeStr,
                   ),
-                  _StatusRow(
-                    icon: Icons.timer_outlined,
-                    color: state == CheckInState.ok || state == CheckInState.windowOpen
-                        ? Colors.orange
-                        : color,
-                    label: l10n.nextDeadline,
-                    value: deadlineStr,
-                  ),
-                  if (state == CheckInState.ok)
+                  if (state == CheckInState.windowOpen && windowEnd != null)
                     _StatusRow(
-                      icon: Icons.lock_clock,
-                      color: Colors.grey,
-                      label: l10n.checkInWindowStartLabel,
-                      value: windowStartStr,
+                      icon: Icons.timer_outlined,
+                      color: Colors.amber,
+                      label: l10n.windowEndsAtLabel,
+                      value: timeFormat.format(windowEnd),
+                    ),
+                  if (state != CheckInState.windowOpen)
+                    _StatusRow(
+                      icon: Icons.timer_outlined,
+                      color: Colors.orange,
+                      label: l10n.nextWindowLabel,
+                      value: _formatNextWindow(nextStart, l10n),
                     ),
                 ],
               );
@@ -160,24 +135,13 @@ class _StatusIndicatorState extends ConsumerState<StatusIndicator> {
   }
 }
 
-String _formatDateTime(DateTime dt) {
+String _formatNextWindow(DateTime dt, AppLocalizations l10n) {
   final now = DateTime.now();
   final isToday =
       dt.year == now.year && dt.month == now.month && dt.day == now.day;
   return isToday
       ? DateFormat('HH:mm').format(dt)
-      : DateFormat('dd.MM.yyyy HH:mm').format(dt);
-}
-
-String _formatDeadline(
-    DateTime deadline, CheckInConfig config, AppLocalizations l10n) {
-  if (config.timingMode == TimingMode.interval) {
-    return DateFormat('dd.MM.yyyy HH:mm').format(deadline);
-  }
-  final isToday = deadline.day == DateTime.now().day;
-  return isToday
-      ? DateFormat('HH:mm').format(deadline)
-      : '${l10n.tomorrow} ${DateFormat('HH:mm').format(deadline)}';
+      : '${l10n.tomorrow} ${DateFormat('HH:mm').format(dt)}';
 }
 
 class _StatusRow extends StatelessWidget {

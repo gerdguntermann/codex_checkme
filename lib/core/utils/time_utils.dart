@@ -1,113 +1,103 @@
 import '../../domain/entities/check_in_config.dart';
 
-enum CheckInState { ok, windowOpen, grace, overdue }
+enum CheckInState { ok, windowOpen, overdue }
 
 class TimeUtils {
-  static DateTime previousFixedDeadline(CheckInConfig config) {
-    final now = DateTime.now();
-    final todayDeadline = DateTime(
-        now.year, now.month, now.day, config.checkInHour, config.checkInMinute);
-    return now.isAfter(todayDeadline)
-        ? todayDeadline
-        : todayDeadline.subtract(const Duration(days: 1));
-  }
+  static List<CheckInWindow> _sorted(CheckInConfig config) =>
+      config.windows.toList()
+        ..sort((a, b) => a.startHour != b.startHour
+            ? a.startHour.compareTo(b.startHour)
+            : a.startMinute.compareTo(b.startMinute));
 
-  /// The next deadline: for fixedTime mode the next daily occurrence,
-  /// for interval mode lastCheckIn + intervalMinutes.
-  static DateTime nextDeadline(DateTime lastCheckIn, CheckInConfig config) {
-    if (config.timingMode == TimingMode.interval) {
-      return lastCheckIn.add(Duration(minutes: config.intervalMinutes));
+  static (DateTime, DateTime) _windowOnDay(CheckInWindow w, DateTime day) => (
+        DateTime(day.year, day.month, day.day, w.startHour, w.startMinute),
+        DateTime(day.year, day.month, day.day, w.endHour, w.endMinute),
+      );
+
+  /// The most recently started window (open or just closed).
+  /// Checks today first, then yesterday's last window.
+  static (DateTime, DateTime)? _lastStartedWindow(
+      CheckInConfig config, DateTime now) {
+    final sorted = _sorted(config);
+
+    for (final w in sorted.reversed) {
+      final (start, end) = _windowOnDay(w, now);
+      if (!now.isBefore(start)) return (start, end);
     }
-    final now = DateTime.now();
-    final todayDeadline = DateTime(
-        now.year, now.month, now.day, config.checkInHour, config.checkInMinute);
-    return now.isBefore(todayDeadline)
-        ? todayDeadline
-        : todayDeadline.add(const Duration(days: 1));
+
+    // No window started today – use yesterday's last window.
+    return _windowOnDay(sorted.last, now.subtract(const Duration(days: 1)));
   }
 
-  /// Start of the pre-deadline check-in window.
-  static DateTime checkInWindowStart(DateTime lastCheckIn, CheckInConfig config) {
-    final deadline = nextDeadline(lastCheckIn, config);
-    return deadline.subtract(Duration(minutes: config.preDeadlineMinutes));
-  }
-
-  /// Returns the current check-in state based on deadline and grace period.
+  /// Current check-in state.
   static CheckInState getState(DateTime? lastCheckIn, CheckInConfig config) {
-    if (lastCheckIn == null) return CheckInState.ok;
     final now = DateTime.now();
+    final window = _lastStartedWindow(config, now);
+    if (window == null) return CheckInState.ok;
 
-    if (config.timingMode == TimingMode.interval) {
-      final deadline =
-          lastCheckIn.add(Duration(minutes: config.intervalMinutes));
-      if (now.isAfter(
-          deadline.add(Duration(minutes: config.gracePeriodMinutes)))) {
-        return CheckInState.overdue;
+    final (windowStart, windowEnd) = window;
+
+    if (now.isBefore(windowEnd)) {
+      // Currently inside the window.
+      if (lastCheckIn != null && !lastCheckIn.isBefore(windowStart)) {
+        return CheckInState.ok;
       }
-      if (now.isAfter(deadline)) return CheckInState.grace;
-      final windowStart =
-          deadline.subtract(Duration(minutes: config.preDeadlineMinutes));
-      if (now.isAfter(windowStart)) return CheckInState.windowOpen;
+      return CheckInState.windowOpen;
+    }
+
+    // Window has closed – check if user checked in during it.
+    if (lastCheckIn != null &&
+        !lastCheckIn.isBefore(windowStart) &&
+        lastCheckIn.isBefore(windowEnd)) {
       return CheckInState.ok;
     }
-
-    // fixedTime
-    final prev = previousFixedDeadline(config);
-    final prevWindowStart =
-        prev.subtract(Duration(minutes: config.preDeadlineMinutes));
-
-    // A check-in is valid for the most recent deadline cycle if it occurred
-    // at or after the window opening of that cycle (not just after the deadline).
-    if (!lastCheckIn.isBefore(prevWindowStart)) {
-      // Valid check-in – check if the next cycle's window is open.
-      final nextWindowStart = prev
-          .add(const Duration(days: 1))
-          .subtract(Duration(minutes: config.preDeadlineMinutes));
-      if (now.isAfter(nextWindowStart)) return CheckInState.windowOpen;
-      return CheckInState.ok;
-    }
-
-    // No valid check-in for the most recent cycle.
-    // Check if the upcoming deadline's window is currently open (user can still fix it).
-    final upcoming = nextDeadline(lastCheckIn, config);
-    final upcomingWindowStart =
-        upcoming.subtract(Duration(minutes: config.preDeadlineMinutes));
-    if (now.isAfter(upcomingWindowStart)) return CheckInState.windowOpen;
-
-    // Not in any window – determine overdue or grace from the most recent deadline.
-    if (now.isAfter(prev.add(Duration(minutes: config.gracePeriodMinutes)))) {
-      return CheckInState.overdue;
-    }
-    if (now.isAfter(prev)) return CheckInState.grace;
-    return CheckInState.ok;
+    return CheckInState.overdue;
   }
 
-  /// Returns true when the user is allowed to perform a check-in.
-  /// Allowed in windowOpen, grace, overdue states, and on first use (null).
+  /// True when the user may perform a check-in.
+  /// The first ever check-in (null [lastCheckIn]) is always allowed.
   static bool isCheckInAllowed(DateTime? lastCheckIn, CheckInConfig config) {
     if (lastCheckIn == null) return true;
-    return getState(lastCheckIn, config) != CheckInState.ok;
+    return getState(lastCheckIn, config) == CheckInState.windowOpen;
   }
 
-  static bool isOverdue(DateTime? lastCheckIn, CheckInConfig config) =>
-      getState(lastCheckIn, config) == CheckInState.overdue;
+  /// The start [DateTime] of the most recently started window.
+  /// Used as a deduplication key for notifications.
+  static DateTime? currentWindowStart(CheckInConfig config) {
+    final w = _lastStartedWindow(config, DateTime.now());
+    return w?.$1;
+  }
 
-  /// Returns the DateTime when the overdue state began (deadline + grace period).
-  /// Only meaningful when [getState] returns [CheckInState.overdue].
-  static DateTime overdueSince(DateTime lastCheckIn, CheckInConfig config) {
-    if (config.timingMode == TimingMode.interval) {
-      final deadline =
-          lastCheckIn.add(Duration(minutes: config.intervalMinutes));
-      return deadline.add(Duration(minutes: config.gracePeriodMinutes));
+  /// The end [DateTime] of the currently open window, or null if no window
+  /// is open right now.
+  static DateTime? currentWindowEnd(CheckInConfig config) {
+    final now = DateTime.now();
+    final w = _lastStartedWindow(config, now);
+    if (w == null) return null;
+    final (_, end) = w;
+    return now.isBefore(end) ? end : null;
+  }
+
+  /// Duration until the next window opens.
+  /// Returns [Duration.zero] when currently inside a window.
+  static Duration timeUntilNextWindowStart(CheckInConfig config) {
+    final now = DateTime.now();
+    final sorted = _sorted(config);
+
+    for (final w in sorted) {
+      final (start, end) = _windowOnDay(w, now);
+      if (now.isBefore(end)) {
+        return now.isBefore(start) ? start.difference(now) : Duration.zero;
+      }
     }
-    final prev = previousFixedDeadline(config);
-    return prev.add(Duration(minutes: config.gracePeriodMinutes));
+
+    // All today's windows have passed – time until tomorrow's first window.
+    final (firstStart, _) =
+        _windowOnDay(sorted.first, now.add(const Duration(days: 1)));
+    return firstStart.difference(now);
   }
 
-  /// Returns duration remaining until the next deadline, or Duration.zero if past.
-  static Duration timeUntilDeadline(DateTime lastCheckIn, CheckInConfig config) {
-    final deadline = nextDeadline(lastCheckIn, config);
-    final remaining = deadline.difference(DateTime.now());
-    return remaining.isNegative ? Duration.zero : remaining;
-  }
+  /// [DateTime] when the next window opens.
+  static DateTime nextWindowStart(CheckInConfig config) =>
+      DateTime.now().add(timeUntilNextWindowStart(config));
 }

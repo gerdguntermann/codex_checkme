@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:checkme/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/notification_service.dart';
 import '../../providers/config_provider.dart';
 import '../../../domain/entities/check_in_config.dart';
 import 'widgets/interval_slider.dart';
@@ -17,18 +18,20 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
   CheckInConfig? _editingConfig;
   bool _saving = false;
 
-  Future<void> _pickCheckInTime(CheckInConfig editing) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
-          hour: editing.checkInHour, minute: editing.checkInMinute),
-    );
-    if (picked != null) {
-      setState(() => _editingConfig = editing.copyWith(
-            checkInHour: picked.hour,
-            checkInMinute: picked.minute,
-          ));
-    }
+  Future<void> _pickTime(int windowIndex, bool isStart) async {
+    final editing = _editingConfig!;
+    final window = editing.windows[windowIndex];
+    final initial = isStart
+        ? TimeOfDay(hour: window.startHour, minute: window.startMinute)
+        : TimeOfDay(hour: window.endHour, minute: window.endMinute);
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked == null) return;
+    final updated = isStart
+        ? window.copyWith(startHour: picked.hour, startMinute: picked.minute)
+        : window.copyWith(endHour: picked.hour, endMinute: picked.minute);
+    final windows = List<CheckInWindow>.from(editing.windows);
+    windows[windowIndex] = updated;
+    setState(() => _editingConfig = editing.copyWith(windows: windows));
   }
 
   Future<void> _save(AppLocalizations l10n) async {
@@ -87,107 +90,61 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Windows ─────────────────────────────────────────
+                for (int i = 0; i < editing.windows.length; i++) ...[
+                  _WindowCard(
+                    index: i,
+                    window: editing.windows[i],
+                    canRemove: editing.windows.length > 1,
+                    onPickStart: () => _pickTime(i, true),
+                    onPickEnd: () => _pickTime(i, false),
+                    onRemove: () {
+                      final windows =
+                          List<CheckInWindow>.from(editing.windows)
+                            ..removeAt(i);
+                      setState(() =>
+                          _editingConfig = editing.copyWith(windows: windows));
+                    },
+                    l10n: l10n,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (editing.windows.length < 2)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.addWindow),
+                    onPressed: () {
+                      final windows =
+                          List<CheckInWindow>.from(editing.windows)
+                            ..add(const CheckInWindow(
+                              startHour: 18,
+                              startMinute: 0,
+                              endHour: 19,
+                              endMinute: 0,
+                            ));
+                      setState(() =>
+                          _editingConfig = editing.copyWith(windows: windows));
+                    },
+                  ),
+                const SizedBox(height: 8),
+
+                // ── Max notifications ────────────────────────────────
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Mode selector ────────────────────────────
-                        Text(l10n.timingModeLabel,
-                            style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        SegmentedButton<TimingMode>(
-                          segments: [
-                            ButtonSegment(
-                              value: TimingMode.fixedTime,
-                              label: Text(l10n.timingModeFixedTime),
-                              icon: const Icon(Icons.schedule),
-                            ),
-                            ButtonSegment(
-                              value: TimingMode.interval,
-                              label: Text(l10n.timingModeInterval),
-                              icon: const Icon(Icons.timer),
-                            ),
-                          ],
-                          selected: {editing.timingMode},
-                          onSelectionChanged: (s) => setState(
-                              () => _editingConfig =
-                                  editing.copyWith(timingMode: s.first)),
-                        ),
-                        const Divider(height: 24),
-
-                        // ── Fixed time controls ──────────────────────
-                        if (editing.timingMode == TimingMode.fixedTime) ...[
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.access_time),
-                            title: Text(l10n.dailyCheckInTime),
-                            subtitle: Text(
-                              '${editing.checkInHour.toString().padLeft(2, '0')}:${editing.checkInMinute.toString().padLeft(2, '0')}${l10n.timeUnitSuffix}',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            trailing: const Icon(Icons.edit),
-                            onTap: () => _pickCheckInTime(editing),
-                          ),
-                        ],
-
-                        // ── Interval controls ────────────────────────
-                        if (editing.timingMode == TimingMode.interval) ...[
-                          IntervalSlider(
-                            label: l10n.checkInIntervalLabel,
-                            value: editing.intervalMinutes,
-                            min: 5,
-                            max: 1440,
-                            step: 5,
-                            formatValue: (v) {
-                              if (v < 60) return '$v min';
-                              final h = v ~/ 60;
-                              final m = v % 60;
-                              return m == 0 ? '${h}h' : '${h}h ${m}min';
-                            },
-                            onChanged: (v) => setState(() =>
-                                _editingConfig =
-                                    editing.copyWith(intervalMinutes: v)),
-                          ),
-                        ],
-
-                        const Divider(height: 24),
-
-                        // ── Shared controls ──────────────────────────
-                        IntervalSlider(
-                          label: l10n.preDeadlineLabel,
-                          value: editing.preDeadlineMinutes,
-                          min: 5,
-                          max: 240,
-                          unit: l10n.minuteUnit,
-                          onChanged: (v) => setState(() => _editingConfig =
-                              editing.copyWith(preDeadlineMinutes: v)),
-                        ),
-                        const Divider(height: 24),
-                        IntervalSlider(
-                          label: l10n.gracePeriodLabel,
-                          value: editing.gracePeriodMinutes,
-                          min: 0,
-                          max: 120,
-                          unit: l10n.minuteUnit,
-                          onChanged: (v) => setState(() => _editingConfig =
-                              editing.copyWith(gracePeriodMinutes: v)),
-                        ),
-                        const Divider(height: 24),
-                        IntervalSlider(
-                          label: l10n.maxNotificationsLabel,
-                          value: editing.maxNotifications,
-                          min: 1,
-                          max: 10,
-                          onChanged: (v) => setState(() => _editingConfig =
-                              editing.copyWith(maxNotifications: v)),
-                        ),
-                      ],
+                    child: IntervalSlider(
+                      label: l10n.maxNotificationsLabel,
+                      value: editing.maxNotifications,
+                      min: 1,
+                      max: 10,
+                      onChanged: (v) => setState(() => _editingConfig =
+                          editing.copyWith(maxNotifications: v)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
+
+                // ── Monitoring toggle ────────────────────────────────
                 Card(
                   child: SwitchListTile(
                     title: Text(l10n.monitoringActive),
@@ -197,10 +154,108 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
                         () => _editingConfig = editing.copyWith(isActive: v)),
                   ),
                 ),
+                const SizedBox(height: 8),
+
+                // ── Test notification ────────────────────────────────
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.notifications_active),
+                    title: const Text('Test-Benachrichtigung'),
+                    subtitle: const Text(
+                        'Sofortige Benachrichtigung senden um Berechtigungen zu prüfen'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await NotificationService.requestPermissions();
+                      await NotificationService.showTest();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Benachrichtigung gesendet – erscheint sie?'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _WindowCard extends StatelessWidget {
+  final int index;
+  final CheckInWindow window;
+  final bool canRemove;
+  final VoidCallback onPickStart;
+  final VoidCallback onPickEnd;
+  final VoidCallback onRemove;
+  final AppLocalizations l10n;
+
+  const _WindowCard({
+    required this.index,
+    required this.window,
+    required this.canRemove,
+    required this.onPickStart,
+    required this.onPickEnd,
+    required this.onRemove,
+    required this.l10n,
+  });
+
+  String _fmt(int h, int m) =>
+      '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} Uhr';
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Fenster ${index + 1}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                if (canRemove)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline,
+                        color: Colors.red),
+                    onPressed: onRemove,
+                  ),
+              ],
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.lock_open),
+              title: Text(l10n.windowStartLabel),
+              subtitle: Text(
+                _fmt(window.startHour, window.startMinute),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              trailing: const Icon(Icons.edit),
+              onTap: onPickStart,
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.lock),
+              title: Text(l10n.windowEndLabel),
+              subtitle: Text(
+                _fmt(window.endHour, window.endMinute),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              trailing: const Icon(Icons.edit),
+              onTap: onPickEnd,
+            ),
+          ],
+        ),
       ),
     );
   }

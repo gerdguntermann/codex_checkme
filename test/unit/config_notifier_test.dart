@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import 'package:checkme/data/check_in_service.dart';
 import 'package:checkme/data/config_service.dart';
 import 'package:checkme/domain/entities/check_in_config.dart';
 import 'package:checkme/presentation/providers/config_provider.dart';
@@ -22,13 +21,15 @@ ProviderContainer _buildContainer(
   ]);
 }
 
-Future<int> _checkInCount(FakeFirebaseFirestore firestore) async {
+Future<Map<String, dynamic>?> _loadStoredConfig(
+    FakeFirebaseFirestore firestore) async {
   final snap = await firestore
       .collection('users')
       .doc(_uid)
-      .collection('check_ins')
+      .collection('config')
+      .doc('user_config')
       .get();
-  return snap.docs.length;
+  return snap.data();
 }
 
 void main() {
@@ -41,82 +42,56 @@ void main() {
     prefs = await SharedPreferences.getInstance();
   });
 
-  group('ConfigNotifier.saveConfig – impliziter Check-in', () {
-    test('schreibt Check-in wenn timingMode geändert wird', () async {
-      final container = _buildContainer(firestore, prefs);
-      addTearDown(container.dispose);
-
-      // Initialzustand laden
-      final notifier = container.read(configNotifierProvider.notifier);
-      await container.read(configNotifierProvider.future);
-
-      final changed = CheckInConfig.defaults()
-          .copyWith(timingMode: TimingMode.interval);
-      await notifier.saveConfig(changed);
-
-      expect(await _checkInCount(firestore), 1);
-    });
-
-    test('schreibt Check-in wenn checkInHour geändert wird', () async {
+  group('ConfigNotifier.saveConfig', () {
+    test('persists config to Firestore', () async {
       final container = _buildContainer(firestore, prefs);
       addTearDown(container.dispose);
 
       final notifier = container.read(configNotifierProvider.notifier);
       await container.read(configNotifierProvider.future);
 
-      await notifier.saveConfig(CheckInConfig.defaults().copyWith(checkInHour: 10));
+      final cfg = CheckInConfig.defaults().copyWith(maxNotifications: 5);
+      await notifier.saveConfig(cfg);
 
-      expect(await _checkInCount(firestore), 1);
+      final stored = await _loadStoredConfig(firestore);
+      expect(stored, isNotNull);
+      expect(stored!['maxNotifications'], 5);
     });
 
-    test('schreibt Check-in wenn intervalMinutes geändert wird', () async {
+    test('updates provider state immediately', () async {
       final container = _buildContainer(firestore, prefs);
       addTearDown(container.dispose);
 
       final notifier = container.read(configNotifierProvider.notifier);
       await container.read(configNotifierProvider.future);
 
-      await notifier.saveConfig(CheckInConfig.defaults().copyWith(intervalMinutes: 60));
+      final cfg = CheckInConfig.defaults().copyWith(isActive: false);
+      await notifier.saveConfig(cfg);
 
-      expect(await _checkInCount(firestore), 1);
+      expect(
+          container.read(configNotifierProvider).valueOrNull?.isActive, isFalse);
     });
 
-    test('kein Check-in wenn nur gracePeriodMinutes geändert wird', () async {
+    test('can save two windows', () async {
       final container = _buildContainer(firestore, prefs);
       addTearDown(container.dispose);
 
       final notifier = container.read(configNotifierProvider.notifier);
       await container.read(configNotifierProvider.future);
 
-      await notifier.saveConfig(
-          CheckInConfig.defaults().copyWith(gracePeriodMinutes: 60));
+      final cfg = CheckInConfig(
+        windows: const [
+          CheckInWindow(startHour: 9, startMinute: 0, endHour: 10, endMinute: 0),
+          CheckInWindow(startHour: 18, startMinute: 0, endHour: 19, endMinute: 0),
+        ],
+        maxNotifications: 3,
+        isActive: true,
+      );
+      await notifier.saveConfig(cfg);
 
-      expect(await _checkInCount(firestore), 0);
-    });
-
-    test('kein Check-in wenn maxNotifications geändert wird', () async {
-      final container = _buildContainer(firestore, prefs);
-      addTearDown(container.dispose);
-
-      final notifier = container.read(configNotifierProvider.notifier);
-      await container.read(configNotifierProvider.future);
-
-      await notifier.saveConfig(
-          CheckInConfig.defaults().copyWith(maxNotifications: 5));
-
-      expect(await _checkInCount(firestore), 0);
-    });
-
-    test('kein Check-in beim ersten Laden (kein vorheriger State)', () async {
-      // Direkt saveConfig aufrufen ohne vorherigen build()-Durchlauf
-      final container = _buildContainer(firestore, prefs);
-      addTearDown(container.dispose);
-
-      final notifier = container.read(configNotifierProvider.notifier);
-      // build() noch nicht abgewartet → state ist AsyncLoading
-      await notifier.saveConfig(CheckInConfig.defaults());
-
-      expect(await _checkInCount(firestore), 0);
+      final stored = await _loadStoredConfig(firestore);
+      final windows = stored!['windows'] as List;
+      expect(windows.length, 2);
     });
   });
 }

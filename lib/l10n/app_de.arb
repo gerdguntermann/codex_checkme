@@ -58,6 +58,12 @@
   "monitoringActive": "Monitoring aktiv",
   "monitoringSubtitle": "Alle Benachrichtigungen ein-/ausschalten",
 
+  "windowStartLabel": "Fenster öffnet",
+  "windowEndLabel": "Fenster schließt",
+  "addWindow": "Zweites Zeitfenster hinzufügen",
+  "windowEndsAtLabel": "Fenster endet",
+  "nextWindowLabel": "Nächstes Fenster",
+
   "contactsTitle": "Kontakte",
   "noContactsYet": "Noch keine Kontakte",
   "tapToAddContact": "Tippe + um einen Kontakt hinzuzufügen",

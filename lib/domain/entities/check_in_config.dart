@@ -1,70 +1,69 @@
 import 'package:equatable/equatable.dart';
 
-enum TimingMode { fixedTime, interval }
+/// A single daily check-in window defined by start and end wall-clock times.
+/// All values use 24-hour format.
+class CheckInWindow extends Equatable {
+  final int startHour;
+  final int startMinute;
+  final int endHour;
+  final int endMinute;
+
+  const CheckInWindow({
+    required this.startHour,
+    required this.startMinute,
+    required this.endHour,
+    required this.endMinute,
+  });
+
+  CheckInWindow copyWith({
+    int? startHour,
+    int? startMinute,
+    int? endHour,
+    int? endMinute,
+  }) =>
+      CheckInWindow(
+        startHour: startHour ?? this.startHour,
+        startMinute: startMinute ?? this.startMinute,
+        endHour: endHour ?? this.endHour,
+        endMinute: endMinute ?? this.endMinute,
+      );
+
+  @override
+  List<Object?> get props => [startHour, startMinute, endHour, endMinute];
+}
 
 class CheckInConfig extends Equatable {
-  final TimingMode timingMode;
-  final int checkInHour;
-  final int checkInMinute;
-  final int intervalMinutes;
-  final int gracePeriodMinutes;
-  final int preDeadlineMinutes;
+  /// One or two daily check-in windows, sorted by start time.
+  final List<CheckInWindow> windows;
   final int maxNotifications;
   final bool isActive;
 
   const CheckInConfig({
-    required this.timingMode,
-    required this.checkInHour,
-    required this.checkInMinute,
-    required this.intervalMinutes,
-    required this.gracePeriodMinutes,
-    required this.preDeadlineMinutes,
+    required this.windows,
     required this.maxNotifications,
     required this.isActive,
   });
 
   factory CheckInConfig.defaults() => const CheckInConfig(
-        timingMode: TimingMode.fixedTime,
-        checkInHour: 9,
-        checkInMinute: 0,
-        intervalMinutes: 240,
-        gracePeriodMinutes: 30,
-        preDeadlineMinutes: 60,
+        windows: [
+          CheckInWindow(
+              startHour: 9, startMinute: 0, endHour: 10, endMinute: 0),
+        ],
         maxNotifications: 3,
         isActive: true,
       );
 
   CheckInConfig copyWith({
-    TimingMode? timingMode,
-    int? checkInHour,
-    int? checkInMinute,
-    int? intervalMinutes,
-    int? gracePeriodMinutes,
-    int? preDeadlineMinutes,
+    List<CheckInWindow>? windows,
     int? maxNotifications,
     bool? isActive,
-  }) {
-    return CheckInConfig(
-      timingMode: timingMode ?? this.timingMode,
-      checkInHour: checkInHour ?? this.checkInHour,
-      checkInMinute: checkInMinute ?? this.checkInMinute,
-      intervalMinutes: intervalMinutes ?? this.intervalMinutes,
-      gracePeriodMinutes: gracePeriodMinutes ?? this.gracePeriodMinutes,
-      preDeadlineMinutes: preDeadlineMinutes ?? this.preDeadlineMinutes,
-      maxNotifications: maxNotifications ?? this.maxNotifications,
-      isActive: isActive ?? this.isActive,
-    );
-  }
+  }) =>
+      CheckInConfig(
+        windows: windows ?? this.windows,
+        maxNotifications: maxNotifications ?? this.maxNotifications,
+        isActive: isActive ?? this.isActive,
+      );
 
   @override
-  List<Object?> get props => [
-        timingMode,
-        checkInHour,
-        checkInMinute,
-        intervalMinutes,
-        gracePeriodMinutes,
-        preDeadlineMinutes,
-        maxNotifications,
-        isActive,
-      ];
+  List<Object?> get props => [windows, maxNotifications, isActive];
 }

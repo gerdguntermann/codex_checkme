@@ -23,10 +23,12 @@ void main() {
     });
 
     test('returns stored config after save', () async {
-      final saved = CheckInConfig.defaults().copyWith(
-        timingMode: TimingMode.interval,
-        intervalMinutes: 120,
-        gracePeriodMinutes: 20,
+      final saved = CheckInConfig(
+        windows: const [
+          CheckInWindow(startHour: 8, startMinute: 0, endHour: 9, endMinute: 0),
+          CheckInWindow(
+              startHour: 18, startMinute: 0, endHour: 19, endMinute: 0),
+        ],
         maxNotifications: 5,
         isActive: false,
       );
@@ -53,7 +55,13 @@ void main() {
     });
 
     test('caches to SharedPreferences (survives firestore downtime)', () async {
-      final cfg = CheckInConfig.defaults().copyWith(intervalMinutes: 60);
+      final cfg = CheckInConfig(
+        windows: const [
+          CheckInWindow(startHour: 7, startMinute: 0, endHour: 8, endMinute: 0)
+        ],
+        maxNotifications: 3,
+        isActive: true,
+      );
       await service.saveConfig(uid, cfg);
 
       // New service with empty Firestore but same prefs → must use cache
@@ -61,7 +69,7 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       final cachedService = ConfigService(emptyFirestore, prefs);
       final loaded = await cachedService.getConfig(uid);
-      expect(loaded.intervalMinutes, 60);
+      expect(loaded.windows.first.startHour, 7);
     });
 
     test('overwrites existing config', () async {

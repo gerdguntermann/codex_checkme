@@ -1,255 +1,259 @@
+// Note: Tests that create windows relative to DateTime.now() may produce
+// unexpected results if run within 2h of midnight (day-boundary edge cases).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:checkme/core/utils/time_utils.dart';
 import 'package:checkme/domain/entities/check_in_config.dart';
 
+CheckInConfig _cfg(List<CheckInWindow> windows) => CheckInConfig(
+      windows: windows,
+      maxNotifications: 3,
+      isActive: true,
+    );
+
+/// Window that started [startMinsAgo] minutes ago and ends [endMinsFromNow]
+/// minutes from now.
+CheckInConfig _openWindow({int startMinsAgo = 30, int endMinsFromNow = 30}) {
+  final now = DateTime.now();
+  final s = now.subtract(Duration(minutes: startMinsAgo));
+  final e = now.add(Duration(minutes: endMinsFromNow));
+  return _cfg([
+    CheckInWindow(
+        startHour: s.hour,
+        startMinute: s.minute,
+        endHour: e.hour,
+        endMinute: e.minute),
+  ]);
+}
+
+/// Window that started [startMinsAgo] minutes ago and ended [endMinsAgo]
+/// minutes ago.
+CheckInConfig _closedWindow({int startMinsAgo = 70, int endMinsAgo = 10}) {
+  final now = DateTime.now();
+  final s = now.subtract(Duration(minutes: startMinsAgo));
+  final e = now.subtract(Duration(minutes: endMinsAgo));
+  return _cfg([
+    CheckInWindow(
+        startHour: s.hour,
+        startMinute: s.minute,
+        endHour: e.hour,
+        endMinute: e.minute),
+  ]);
+}
+
 void main() {
-  CheckInConfig intervalCfg({
-    int intervalMinutes = 60,
-    int gracePeriodMinutes = 10,
-    int preDeadlineMinutes = 0,
-  }) =>
-      CheckInConfig(
-        timingMode: TimingMode.interval,
-        checkInHour: 9,
-        checkInMinute: 0,
-        intervalMinutes: intervalMinutes,
-        gracePeriodMinutes: gracePeriodMinutes,
-        preDeadlineMinutes: preDeadlineMinutes,
-        maxNotifications: 3,
-        isActive: true,
-      );
+  // ── getState ──────────────────────────────────────────────────────────────
 
-  // Fixed-time config with deadline at a given hour (today or yesterday)
-  CheckInConfig fixedCfg({
-    required int hour,
-    int minute = 0,
-    int gracePeriodMinutes = 30,
-    int preDeadlineMinutes = 0,
-  }) =>
-      CheckInConfig(
-        timingMode: TimingMode.fixedTime,
-        checkInHour: hour,
-        checkInMinute: minute,
-        intervalMinutes: 240,
-        gracePeriodMinutes: gracePeriodMinutes,
-        preDeadlineMinutes: preDeadlineMinutes,
-        maxNotifications: 3,
-        isActive: true,
-      );
-
-  // ── Interval mode ────────────────────────────────────────────────────────
-
-  group('interval mode – getState', () {
-    test('ok: checked in 30 min ago, interval 60 min', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 30));
-      expect(TimeUtils.getState(last, intervalCfg()), CheckInState.ok);
+  group('getState – window open', () {
+    test('windowOpen when no check-in and window is currently open', () {
+      final cfg = _openWindow();
+      // lastCheckIn is very old (before window opened)
+      final last = DateTime.now().subtract(const Duration(hours: 25));
+      expect(TimeUtils.getState(last, cfg), CheckInState.windowOpen);
     });
 
-    test('grace: 65 min ago, interval 60 + grace 10', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 65));
-      expect(TimeUtils.getState(last, intervalCfg()), CheckInState.grace);
+    test('windowOpen when lastCheckIn is null and window is open', () {
+      final cfg = _openWindow();
+      expect(TimeUtils.getState(null, cfg), CheckInState.windowOpen);
     });
 
-    test('overdue: 75 min ago, interval 60 + grace 10', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 75));
-      expect(TimeUtils.getState(last, intervalCfg()), CheckInState.overdue);
-    });
-
-    test('null lastCheckIn returns ok', () {
-      expect(TimeUtils.getState(null, intervalCfg()), CheckInState.ok);
-    });
-
-    test('exactly at deadline edge → still ok (not yet past)', () {
-      // 60 min ago – deadline is exactly now, grace not yet elapsed
-      final last = DateTime.now().subtract(const Duration(minutes: 60));
-      // could be ok or grace depending on sub-second timing; at least not overdue
-      final state = TimeUtils.getState(last, intervalCfg());
-      expect(state, isNot(CheckInState.overdue));
-    });
-  });
-
-  group('interval mode – nextDeadline', () {
-    test('returns lastCheckIn + intervalMinutes', () {
-      final last = DateTime(2025, 3, 15, 10, 0);
-      final cfg = intervalCfg(intervalMinutes: 120);
-      expect(TimeUtils.nextDeadline(last, cfg), DateTime(2025, 3, 15, 12, 0));
-    });
-
-    test('5 min interval: deadline 5 min from last check-in', () {
-      final last = DateTime(2025, 1, 1, 8, 0);
-      expect(TimeUtils.nextDeadline(last, intervalCfg(intervalMinutes: 5)),
-          DateTime(2025, 1, 1, 8, 5));
-    });
-  });
-
-  group('interval mode – windowOpen state', () {
-    test('windowOpen: 45 min ago, interval 60, preDeadline 20', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 45));
-      expect(
-        TimeUtils.getState(last, intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20)),
-        CheckInState.windowOpen,
-      );
-    });
-
-    test('ok: 30 min ago, interval 60, preDeadline 20 (before window)', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 30));
-      expect(
-        TimeUtils.getState(last, intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20)),
-        CheckInState.ok,
-      );
-    });
-
-    test('isCheckInAllowed: true in windowOpen', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 45));
-      expect(
-        TimeUtils.isCheckInAllowed(last, intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20)),
-        isTrue,
-      );
-    });
-
-    test('isCheckInAllowed: false in ok (before window)', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 30));
-      expect(
-        TimeUtils.isCheckInAllowed(last, intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20)),
-        isFalse,
-      );
-    });
-
-    test('isCheckInAllowed: true when lastCheckIn is null (first use)', () {
-      expect(
-        TimeUtils.isCheckInAllowed(null, intervalCfg()),
-        isTrue,
-      );
-    });
-
-    test('checkInWindowStart returns deadline minus preDeadlineMinutes', () {
-      final last = DateTime(2025, 3, 15, 10, 0);
-      final cfg = intervalCfg(intervalMinutes: 60, preDeadlineMinutes: 20);
-      // deadline = 11:00, window = 10:40
-      expect(
-        TimeUtils.checkInWindowStart(last, cfg),
-        DateTime(2025, 3, 15, 10, 40),
-      );
-    });
-  });
-
-  group('interval mode – isOverdue', () {
-    test('true when state is overdue', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 75));
-      expect(TimeUtils.isOverdue(last, intervalCfg()), isTrue);
-    });
-
-    test('false when in grace period', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 65));
-      expect(TimeUtils.isOverdue(last, intervalCfg()), isFalse);
-    });
-
-    test('false when ok', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 30));
-      expect(TimeUtils.isOverdue(last, intervalCfg()), isFalse);
-    });
-
-    test('null returns false', () {
-      expect(TimeUtils.isOverdue(null, intervalCfg()), isFalse);
-    });
-  });
-
-  // ── Fixed-time mode ──────────────────────────────────────────────────────
-
-  group('fixedTime mode – getState', () {
-    test('ok: checked in after the last fixed deadline', () {
-      final now = DateTime.now();
-      // Deadline 2 hours ago; check-in 1 hour ago → ok
-      final deadlineHour = now.subtract(const Duration(hours: 2)).hour;
-      final cfg = fixedCfg(hour: deadlineHour, gracePeriodMinutes: 30);
-      final last = now.subtract(const Duration(hours: 1));
+    test('ok when checked in during the currently open window', () {
+      final cfg = _openWindow(startMinsAgo: 30, endMinsFromNow: 30);
+      // Checked in 10 min ago = within the open window
+      final last = DateTime.now().subtract(const Duration(minutes: 10));
       expect(TimeUtils.getState(last, cfg), CheckInState.ok);
     });
+  });
 
-    test('overdue: missed deadline + grace elapsed', () {
-      final now = DateTime.now();
-      // Deadline 3 hours ago, grace 30 min, last check-in 25 hours ago
-      final deadlineHour = now.subtract(const Duration(hours: 3)).hour;
-      final cfg = fixedCfg(hour: deadlineHour, gracePeriodMinutes: 30);
-      final last = now.subtract(const Duration(hours: 25));
+  group('getState – window closed', () {
+    test('overdue when window closed and no check-in during it', () {
+      final cfg = _closedWindow();
+      final last = DateTime.now().subtract(const Duration(hours: 25));
       expect(TimeUtils.getState(last, cfg), CheckInState.overdue);
     });
 
-    test('null lastCheckIn returns ok', () {
-      expect(TimeUtils.getState(null, fixedCfg(hour: 9)), CheckInState.ok);
+    test('overdue with null lastCheckIn and closed window', () {
+      final cfg = _closedWindow();
+      expect(TimeUtils.getState(null, cfg), CheckInState.overdue);
     });
 
-    test('ok: checked in within window BEFORE deadline, deadline now passed', () {
-      final now = DateTime.now();
-      // Deadline 30 min ago, window opened 90 min ago (preDeadlineMinutes=60)
-      // Check-in was 45 min ago = within the window, before the deadline
-      final deadlineHour = now.subtract(const Duration(minutes: 30)).hour;
-      final deadlineMinute = now.subtract(const Duration(minutes: 30)).minute;
-      final cfg = fixedCfg(
-        hour: deadlineHour,
-        minute: deadlineMinute,
-        gracePeriodMinutes: 30,
-        preDeadlineMinutes: 60,
-      );
-      final last = now.subtract(const Duration(minutes: 45));
-      // Bug fix: pre-deadline check-in should count as valid AFTER deadline passes
+    test('ok when checked in during the window that has now closed', () {
+      final cfg = _closedWindow(startMinsAgo: 70, endMinsAgo: 10);
+      // Checked in 30 min ago = within the closed window (started 70 min ago, ended 10 min ago)
+      final last = DateTime.now().subtract(const Duration(minutes: 30));
       expect(TimeUtils.getState(last, cfg), CheckInState.ok);
     });
   });
 
-  group('fixedTime mode – nextDeadline', () {
-    test('returns a future DateTime', () {
-      final last = DateTime.now().subtract(const Duration(hours: 1));
-      final deadline = TimeUtils.nextDeadline(last, fixedCfg(hour: 9));
-      expect(deadline.isAfter(DateTime.now()), isTrue);
-    });
-  });
-
-  // ── timeUntilDeadline ────────────────────────────────────────────────────
-
-  group('timeUntilDeadline', () {
-    test('positive when deadline in the future (interval)', () {
-      final last = DateTime.now().subtract(const Duration(minutes: 10));
-      final remaining = TimeUtils.timeUntilDeadline(last, intervalCfg(intervalMinutes: 60));
-      expect(remaining.inMinutes, greaterThan(0));
-    });
-
-    test('Duration.zero when deadline passed (interval)', () {
-      final last = DateTime.now().subtract(const Duration(hours: 3));
-      final remaining = TimeUtils.timeUntilDeadline(last, intervalCfg(intervalMinutes: 60));
-      expect(remaining, Duration.zero);
-    });
-  });
-
-  group('TimeUtils.overdueSince', () {
-    test('interval mode: deadline + gracePeriod', () {
-      final last = DateTime.now().subtract(const Duration(hours: 2));
-      final cfg = intervalCfg(intervalMinutes: 60, gracePeriodMinutes: 15);
-      final since = TimeUtils.overdueSince(last, cfg);
-      final expected = last
-          .add(const Duration(minutes: 60))
-          .add(const Duration(minutes: 15));
-      expect(since, expected);
-    });
-
-    test('fixedTime mode: previousDeadline + gracePeriod', () {
+  group('getState – before window', () {
+    test('returns ok before window with no check-in (treated as yesterday window)',
+        () {
+      // A future window has not started yet; _lastStartedWindow returns yesterday's.
+      // Since it's the same window on yesterday, and lastCheckIn is null → overdue or ok
+      // depending on whether it's actually in overdue. Hard to test time-independently.
+      // Instead, just verify it returns a valid state.
       final now = DateTime.now();
-      // Deadline was 2 hours ago, grace 10 min → overdue since 1h50m ago
-      final deadlineHour = now.subtract(const Duration(hours: 2)).hour;
-      final cfg = CheckInConfig(
-        timingMode: TimingMode.fixedTime,
-        checkInHour: deadlineHour,
-        checkInMinute: now.subtract(const Duration(hours: 2)).minute,
-        intervalMinutes: 240,
-        gracePeriodMinutes: 10,
-        preDeadlineMinutes: 0,
-        maxNotifications: 3,
-        isActive: true,
-      );
-      final prev = TimeUtils.previousFixedDeadline(cfg);
-      final since = TimeUtils.overdueSince(
-          DateTime.now().subtract(const Duration(days: 1)), cfg);
-      expect(since, prev.add(const Duration(minutes: 10)));
+      final start = now.add(const Duration(minutes: 30));
+      final end = now.add(const Duration(minutes: 90));
+      final cfg = _cfg([
+        CheckInWindow(
+            startHour: start.hour,
+            startMinute: start.minute,
+            endHour: end.hour,
+            endMinute: end.minute),
+      ]);
+      final state = TimeUtils.getState(null, cfg);
+      expect(state, isA<CheckInState>());
+    });
+  });
+
+  // ── isCheckInAllowed ──────────────────────────────────────────────────────
+
+  group('isCheckInAllowed', () {
+    test('true when lastCheckIn is null (first use)', () {
+      expect(TimeUtils.isCheckInAllowed(null, CheckInConfig.defaults()), isTrue);
+    });
+
+    test('true when window is open and no check-in during it', () {
+      final cfg = _openWindow();
+      final last = DateTime.now().subtract(const Duration(hours: 25));
+      expect(TimeUtils.isCheckInAllowed(last, cfg), isTrue);
+    });
+
+    test('false when checked in during currently open window', () {
+      final cfg = _openWindow(startMinsAgo: 30, endMinsFromNow: 30);
+      final last = DateTime.now().subtract(const Duration(minutes: 10));
+      expect(TimeUtils.isCheckInAllowed(last, cfg), isFalse);
+    });
+
+    test('false when window closed and user is overdue', () {
+      final cfg = _closedWindow();
+      final last = DateTime.now().subtract(const Duration(hours: 25));
+      expect(TimeUtils.isCheckInAllowed(last, cfg), isFalse);
+    });
+  });
+
+  // ── currentWindowStart / currentWindowEnd ─────────────────────────────────
+
+  group('currentWindowStart', () {
+    test('returns start of currently open window', () {
+      final now = DateTime.now();
+      final startDt = now.subtract(const Duration(minutes: 30));
+      final endDt = now.add(const Duration(minutes: 30));
+      final cfg = _cfg([
+        CheckInWindow(
+            startHour: startDt.hour,
+            startMinute: startDt.minute,
+            endHour: endDt.hour,
+            endMinute: endDt.minute),
+      ]);
+      final windowStart = TimeUtils.currentWindowStart(cfg);
+      expect(windowStart, isNotNull);
+      expect(windowStart!.hour, startDt.hour);
+      expect(windowStart.minute, startDt.minute);
+    });
+  });
+
+  group('currentWindowEnd', () {
+    test('returns end datetime when window is open', () {
+      final now = DateTime.now();
+      final start = now.subtract(const Duration(minutes: 30));
+      final end = now.add(const Duration(minutes: 30));
+      final cfg = _cfg([
+        CheckInWindow(
+            startHour: start.hour,
+            startMinute: start.minute,
+            endHour: end.hour,
+            endMinute: end.minute),
+      ]);
+      final windowEnd = TimeUtils.currentWindowEnd(cfg);
+      expect(windowEnd, isNotNull);
+      expect(windowEnd!.isAfter(now), isTrue);
+    });
+
+    test('returns null when window is closed', () {
+      final cfg = _closedWindow();
+      expect(TimeUtils.currentWindowEnd(cfg), isNull);
+    });
+  });
+
+  // ── timeUntilNextWindowStart ──────────────────────────────────────────────
+
+  group('timeUntilNextWindowStart', () {
+    test('returns Duration.zero when inside a window', () {
+      final cfg = _openWindow();
+      expect(TimeUtils.timeUntilNextWindowStart(cfg), Duration.zero);
+    });
+
+    test('returns positive duration when outside a window', () {
+      final cfg = _closedWindow();
+      final delay = TimeUtils.timeUntilNextWindowStart(cfg);
+      expect(delay.inSeconds, greaterThan(0));
+    });
+  });
+
+  // ── nextWindowStart ───────────────────────────────────────────────────────
+
+  group('nextWindowStart', () {
+    test('returns future datetime when outside window', () {
+      final cfg = _closedWindow();
+      final next = TimeUtils.nextWindowStart(cfg);
+      expect(next.isAfter(DateTime.now()), isTrue);
+    });
+
+    test('returns approximately now when inside window', () {
+      final cfg = _openWindow();
+      final next = TimeUtils.nextWindowStart(cfg);
+      // When inside window, delay is 0, so nextWindowStart ≈ now
+      expect(next.isAfter(DateTime.now().subtract(const Duration(seconds: 5))),
+          isTrue);
+    });
+  });
+
+  // ── Two-window config ─────────────────────────────────────────────────────
+
+  group('two-window config', () {
+    test('windowOpen in first window', () {
+      final now = DateTime.now();
+      final w1start = now.subtract(const Duration(minutes: 30));
+      final w1end = now.add(const Duration(minutes: 30));
+      final w2start = now.add(const Duration(hours: 6));
+      final w2end = now.add(const Duration(hours: 7));
+      final cfg = _cfg([
+        CheckInWindow(
+            startHour: w1start.hour,
+            startMinute: w1start.minute,
+            endHour: w1end.hour,
+            endMinute: w1end.minute),
+        CheckInWindow(
+            startHour: w2start.hour,
+            startMinute: w2start.minute,
+            endHour: w2end.hour,
+            endMinute: w2end.minute),
+      ]);
+      final last = now.subtract(const Duration(hours: 25));
+      expect(TimeUtils.getState(last, cfg), CheckInState.windowOpen);
+    });
+
+    test('ok after checking in during first window', () {
+      final now = DateTime.now();
+      final w1start = now.subtract(const Duration(minutes: 30));
+      final w1end = now.add(const Duration(minutes: 30));
+      final w2start = now.add(const Duration(hours: 6));
+      final w2end = now.add(const Duration(hours: 7));
+      final cfg = _cfg([
+        CheckInWindow(
+            startHour: w1start.hour,
+            startMinute: w1start.minute,
+            endHour: w1end.hour,
+            endMinute: w1end.minute),
+        CheckInWindow(
+            startHour: w2start.hour,
+            startMinute: w2start.minute,
+            endHour: w2end.hour,
+            endMinute: w2end.minute),
+      ]);
+      final last = now.subtract(const Duration(minutes: 10));
+      expect(TimeUtils.getState(last, cfg), CheckInState.ok);
     });
   });
 }

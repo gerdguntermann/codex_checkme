@@ -2,6 +2,7 @@ import 'package:checkme/core/utils/app_logger.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../background/background_service.dart';
 import '../../domain/entities/check_in_config.dart';
 import 'auth_provider.dart';
 import 'service_providers.dart';
@@ -19,28 +20,23 @@ class ConfigNotifier extends AsyncNotifier<CheckInConfig> {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
 
-    final previous = state.valueOrNull;
-    final deadlineChanged = previous != null && _isDeadlineChanged(previous, config);
-
     state = AsyncData(config);
-    log('saveConfig – saving (deadlineChanged=$deadlineChanged)', name: 'ConfigNotifier');
+    log('saveConfig – saving', name: 'ConfigNotifier');
     try {
       await ref.read(configServiceProvider).saveConfig(userId, config);
-      if (deadlineChanged) {
-        log('saveConfig – deadline changed, performing implicit check-in', name: 'ConfigNotifier');
-        await ref.read(checkInServiceProvider).performCheckIn(userId);
+      // Re-align Workmanager to the next window start after config change.
+      try {
+        await BackgroundService.registerNextWindow(config);
+      } catch (e) {
+        log('saveConfig – background re-register skipped: $e',
+            name: 'ConfigNotifier');
       }
+      log('saveConfig – done', name: 'ConfigNotifier');
     } catch (e, stack) {
       log('saveConfig – error: $e', name: 'ConfigNotifier');
       state = AsyncError(e, stack);
     }
   }
-
-  bool _isDeadlineChanged(CheckInConfig previous, CheckInConfig next) =>
-      previous.timingMode != next.timingMode ||
-      previous.checkInHour != next.checkInHour ||
-      previous.checkInMinute != next.checkInMinute ||
-      previous.intervalMinutes != next.intervalMinutes;
 }
 
 final configNotifierProvider =

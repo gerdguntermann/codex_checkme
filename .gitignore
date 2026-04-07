@@ -55,5 +55,5 @@ GoogleService-Info.plist
 **/.gradle/
 local.properties
 
-# Claude Code local settings
+# Local agent settings
 .claude/settings.local.json

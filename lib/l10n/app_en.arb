@@ -48,6 +48,12 @@
   "monitoringActive": "Monitoring active",
   "monitoringSubtitle": "Toggle all notifications on/off",
 
+  "windowStartLabel": "Window opens",
+  "windowEndLabel": "Window closes",
+  "addWindow": "Add second time window",
+  "windowEndsAtLabel": "Window ends",
+  "nextWindowLabel": "Next window",
+
   "contactsTitle": "Contacts",
   "noContactsYet": "No contacts yet",
   "tapToAddContact": "Tap + to add a contact",

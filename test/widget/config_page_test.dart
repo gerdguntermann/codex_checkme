@@ -26,77 +26,76 @@ Widget _buildConfigPage(CheckInConfig config) => buildTestApp(
     );
 
 void main() {
-  group('ConfigPage – mode selector', () {
-    testWidgets('shows SegmentedButton with both options', (tester) async {
+  group('ConfigPage – window configuration', () {
+    testWidgets('shows Fenster 1 card', (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
 
-      expect(find.text('Feste Uhrzeit'), findsOneWidget);
-      expect(find.text('Intervall'), findsOneWidget);
+      expect(find.text('Fenster 1'), findsOneWidget);
     });
 
-    testWidgets('fixedTime mode shows time picker tile', (tester) async {
+    testWidgets('shows start and end time picker tiles', (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
 
-      expect(find.text('Tägliche Check-in Zeit'), findsOneWidget);
-      expect(find.byIcon(Icons.edit), findsOneWidget);
+      expect(find.text('Fenster öffnet'), findsOneWidget);
+      expect(find.text('Fenster schließt'), findsOneWidget);
     });
 
-    testWidgets('interval mode shows interval slider, not time picker', (tester) async {
-      await tester.pumpWidget(_buildConfigPage(
-        CheckInConfig.defaults().copyWith(timingMode: TimingMode.interval),
-      ));
-      await tester.pump();
-
-      expect(find.text('Check-in Intervall'), findsOneWidget);
-      expect(find.text('Tägliche Check-in Zeit'), findsNothing);
-    });
-
-    testWidgets('switching to interval mode shows interval slider', (tester) async {
+    testWidgets('shows add-second-window button when only 1 window',
+        (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
 
-      await tester.tap(find.text('Intervall'));
-      await tester.pump();
-
-      expect(find.text('Check-in Intervall'), findsOneWidget);
-      expect(find.text('Tägliche Check-in Zeit'), findsNothing);
+      expect(find.text('Zweites Zeitfenster hinzufügen'), findsOneWidget);
     });
 
-    testWidgets('switching back to fixedTime restores time picker', (tester) async {
-      await tester.pumpWidget(_buildConfigPage(
-        CheckInConfig.defaults().copyWith(timingMode: TimingMode.interval),
-      ));
+    testWidgets('add-window button adds second window card', (tester) async {
+      await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
 
-      await tester.tap(find.text('Feste Uhrzeit'));
+      await tester.tap(find.text('Zweites Zeitfenster hinzufügen'));
       await tester.pump();
 
-      expect(find.text('Tägliche Check-in Zeit'), findsOneWidget);
-      expect(find.text('Check-in Intervall'), findsNothing);
+      expect(find.text('Fenster 1'), findsOneWidget);
+      expect(find.text('Fenster 2'), findsOneWidget);
+      expect(find.text('Zweites Zeitfenster hinzufügen'), findsNothing);
+    });
+
+    testWidgets('shows remove button when 2 windows exist', (tester) async {
+      final config = CheckInConfig.defaults().copyWith(
+        windows: const [
+          CheckInWindow(startHour: 9, startMinute: 0, endHour: 10, endMinute: 0),
+          CheckInWindow(
+              startHour: 18, startMinute: 0, endHour: 19, endMinute: 0),
+        ],
+      );
+      await tester.pumpWidget(_buildConfigPage(config));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.remove_circle_outline), findsNWidgets(2));
+    });
+
+    testWidgets('no mode selector (SegmentedButton) present', (tester) async {
+      await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
+      await tester.pump();
+
+      expect(find.byType(SegmentedButton<dynamic>), findsNothing);
     });
   });
 
   group('ConfigPage – shared controls', () {
-    testWidgets('shows grace period slider for both modes', (tester) async {
-      for (final mode in TimingMode.values) {
-        await tester.pumpWidget(
-            _buildConfigPage(CheckInConfig.defaults().copyWith(timingMode: mode)));
-        await tester.pump();
-        expect(find.text('Karenzzeit nach Check-in'), findsOneWidget, reason: 'mode: $mode');
-      }
-    });
-
     testWidgets('shows max notifications slider', (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
+
       expect(find.text('Max. Benachrichtigungen / Tag'), findsOneWidget);
     });
 
     testWidgets('shows monitoring active switch', (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
+
       expect(find.text('Monitoring aktiv'), findsOneWidget);
       expect(find.byType(SwitchListTile), findsOneWidget);
     });
@@ -114,11 +113,12 @@ void main() {
       expect(saveBtn.onPressed, isNull);
     });
 
-    testWidgets('save button enabled after switching mode', (tester) async {
+    testWidgets('save button enabled after adding a second window',
+        (tester) async {
       await tester.pumpWidget(_buildConfigPage(CheckInConfig.defaults()));
       await tester.pump();
 
-      await tester.tap(find.text('Intervall'));
+      await tester.tap(find.text('Zweites Zeitfenster hinzufügen'));
       await tester.pump();
 
       final saveBtn = tester.widget<IconButton>(

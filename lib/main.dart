@@ -9,9 +9,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'background/background_service.dart';
 import 'core/constants/app_constants.dart';
+import 'data/check_in_service.dart';
+import 'data/config_service.dart';
+import 'domain/entities/check_in_config.dart';
 import 'data/notification_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -50,30 +54,47 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(AppConstants.userIdKey, uid);
 
-  await BackgroundService.initialize();
-  await BackgroundService.registerPeriodicTask();
-  log('Background service registered', name: 'main');
-
   await NotificationService.initialize();
+  await NotificationService.requestPermissions();
   log('NotificationService initialized', name: 'main');
 
   if (Platform.isAndroid) {
     final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
     if (!batteryStatus.isGranted) {
-      log('Requesting battery optimization exemption', name: 'main');
       await Permission.ignoreBatteryOptimizations.request();
     }
-    final notifStatus = await Permission.notification.status;
-    if (!notifStatus.isGranted) {
-      log('Requesting notification permission', name: 'main');
-      await Permission.notification.request();
-    }
+  }
+
+  if (Platform.isAndroid) {
+    await BackgroundService.initialize();
+    // Register Workmanager with initialDelay tuned to the next window start.
+    await _registerBackgroundTask(uid, prefs);
+    log('Background service registered (Android)', name: 'main');
+  } else {
+    log('Background service skipped (not Android – no Workmanager)',
+        name: 'main');
   }
 
   runApp(ProviderScope(
     overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
     child: const CheckMeApp(),
   ));
+}
+
+/// Loads config from Firestore/cache and registers the Workmanager task with
+/// an [initialDelay] aligned to the next check-in window start.
+Future<void> _registerBackgroundTask(
+    String uid, SharedPreferences prefs) async {
+  try {
+    final config = await ConfigService(
+            FirebaseFirestore.instance, prefs)
+        .getConfig(uid);
+    await BackgroundService.registerNextWindow(config);
+  } catch (e) {
+    log('Startup: failed to load config, using defaults: $e', name: 'main');
+    await BackgroundService.registerNextWindow(
+        CheckInConfig.defaults());
+  }
 }
 
 class CheckMeApp extends ConsumerWidget {

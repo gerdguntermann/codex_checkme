@@ -50,11 +50,10 @@ class _CheckInButtonState extends ConsumerState<CheckInButton> {
         TimeUtils.isCheckInAllowed(lastCheckIn?.timestamp, effectiveConfig);
 
     String? availableFromText;
-    if (!isAllowed && lastCheckIn != null) {
-      final windowStart =
-          TimeUtils.checkInWindowStart(lastCheckIn.timestamp, effectiveConfig);
+    if (!isAllowed) {
+      final nextStart = TimeUtils.nextWindowStart(effectiveConfig);
       availableFromText =
-          l10n.checkInAvailableFrom(DateFormat('HH:mm').format(windowStart));
+          l10n.checkInAvailableFrom(DateFormat('HH:mm').format(nextStart));
     }
 
     return SizedBox(
