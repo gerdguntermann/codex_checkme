@@ -1,0 +1,1 @@
+ C:\\Users\\gerd\\Documents\\WORX\\Computer\\codex\\codex_checkme\\.dart_tool\\flutter_build\\b403a3500027cc5d34e1f5c5db41090e\\native_assets.json: 
