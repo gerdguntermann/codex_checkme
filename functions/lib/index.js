@@ -1,0 +1,185 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendOverdueNotification = exports.cleanupBackgroundLogs = exports.onOverdueTrigger = void 0;
+const admin = require("firebase-admin");
+const functions = require("firebase-functions");
+const resend_1 = require("resend");
+admin.initializeApp();
+const db = admin.firestore();
+function getResend() {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey)
+        throw new Error("RESEND_API_KEY not set in functions/.env");
+    return new resend_1.Resend(apiKey);
+}
+// ─── Triggered by Firestore write to overdue_triggers/{docId} ───────────────
+exports.onOverdueTrigger = functions.firestore
+    .document("overdue_triggers/{docId}")
+    .onCreate(async (snap) => {
+    const data = snap.data();
+    const userId = data.userId;
+    if (!userId) {
+        functions.logger.warn("overdue_triggers doc missing userId", { snap: snap.id });
+        return;
+    }
+    await sendOverdueNotifications(userId);
+    // Delete the trigger doc after processing
+    await snap.ref.delete();
+});
+// ─── Scheduled cleanup: delete background_logs older than 2 days ─────────────
+exports.cleanupBackgroundLogs = functions.pubsub
+    .schedule("0 3 * * *") // daily at 03:00
+    .timeZone("Europe/Berlin")
+    .onRun(async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 2);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoff);
+    const oldLogs = await db
+        .collectionGroup("background_logs")
+        .where("ranAt", "<", cutoffTimestamp)
+        .get();
+    if (oldLogs.empty) {
+        functions.logger.info("cleanupBackgroundLogs: nothing to delete");
+        return;
+    }
+    // Firestore batch limit is 500 operations
+    const chunks = [];
+    for (let i = 0; i < oldLogs.docs.length; i += 500) {
+        chunks.push(oldLogs.docs.slice(i, i + 500));
+    }
+    for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+    }
+    functions.logger.info(`cleanupBackgroundLogs: deleted ${oldLogs.docs.length} entries older than ${cutoff.toISOString()}`);
+});
+// ─── Callable function for manual triggering / testing ───────────────────────
+exports.sendOverdueNotification = functions.https.onCall(async (data, context) => {
+    var _a, _b;
+    const userId = (_a = data.userId) !== null && _a !== void 0 ? _a : (_b = context.auth) === null || _b === void 0 ? void 0 : _b.uid;
+    if (!userId) {
+        throw new functions.https.HttpsError("unauthenticated", "User not authenticated");
+    }
+    await sendOverdueNotifications(userId);
+    return { success: true };
+});
+// ─── Core notification logic ─────────────────────────────────────────────────
+async function sendOverdueNotifications(userId) {
+    var _a, _b, _c, _d;
+    const userRef = db.collection("users").doc(userId);
+    // Load config
+    const configSnap = await userRef.collection("config").doc("user_config").get();
+    if (!configSnap.exists) {
+        functions.logger.info("No config for user", { userId });
+        return;
+    }
+    const config = configSnap.data();
+    if (!config.isActive)
+        return;
+    // Check maxNotifications guard – count ALL log entries (pending/sent/failed) since
+    // the last check-in. Counting pending entries prevents double-sends when parallel
+    // tasks fire before the first one finishes.
+    // Using "since last check-in" instead of "since midnight" prevents repeated
+    // nightly emails when the user is overdue across multiple days.
+    const checkInsSnap = await userRef
+        .collection("check_ins")
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
+    const lastCheckInMs = checkInsSnap.empty
+        ? 0
+        : checkInsSnap.docs[0].data().timestamp.toMillis();
+    const lastCheckInTimestamp = admin.firestore.Timestamp.fromMillis(lastCheckInMs);
+    const logsSnap = await userRef
+        .collection("notification_logs")
+        .where("createdAt", ">=", lastCheckInTimestamp)
+        .get();
+    if (logsSnap.size >= ((_a = config.maxNotifications) !== null && _a !== void 0 ? _a : 3)) {
+        functions.logger.info("Max notifications reached for user since last check-in", { userId, count: logsSnap.size });
+        return;
+    }
+    // Load contacts
+    const contactsSnap = await userRef.collection("contacts").get();
+    if (contactsSnap.empty) {
+        functions.logger.info("No contacts for user", { userId });
+        return;
+    }
+    const contacts = contactsSnap.docs.map((doc) => doc.data());
+    const recipientEmails = contacts.map((c) => c.email).filter(Boolean);
+    if (recipientEmails.length === 0)
+        return;
+    const now = new Date().toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
+    const createdAt = admin.firestore.Timestamp.now();
+    // Write pending log entry BEFORE sending – prevents double-sends when a second
+    // parallel task reads the log count before this function completes.
+    const logRef = await userRef.collection("notification_logs").add({
+        userId,
+        createdAt,
+        recipientEmails,
+        status: "pending",
+    });
+    // In the local emulator, skip the real Resend call and just log the email
+    if (process.env.FUNCTIONS_EMULATOR === "true") {
+        functions.logger.info("[EMULATOR] Mock email – würde senden an:", {
+            to: recipientEmails,
+            subject: "⚠️ CheckMe: Kein Check-in erfolgt",
+            sentAt: now,
+        });
+        await logRef.update({ status: "sent", sentAt: createdAt, emulator: true });
+        return;
+    }
+    const resend = getResend();
+    const fromAddress = (_b = process.env.RESEND_FROM) !== null && _b !== void 0 ? _b : "CheckMe <onboarding@resend.dev>";
+    try {
+        const result = await resend.emails.send({
+            from: fromAddress,
+            to: recipientEmails,
+            subject: "⚠️ CheckMe: Kein Check-in erfolgt",
+            html: `
+        <!DOCTYPE html>
+        <html lang="de">
+        <head><meta charset="UTF-8"></head>
+        <body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+          <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="background: #d32f2f; padding: 24px; text-align: center;">
+              <h1 style="color: #fff; margin: 0; font-size: 24px;">⚠️ CheckMe Alert</h1>
+            </div>
+            <div style="padding: 24px;">
+              <p style="font-size: 16px; color: #333; margin-top: 0;">
+                Die überwachte Person hat sich <strong>nicht innerhalb des erwarteten Zeitfensters</strong> eingecheckt.
+              </p>
+              <div style="background: #fff3e0; border-left: 4px solid #f57c00; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;">
+                <strong style="color: #e65100;">Bitte prüfe ihr Wohlbefinden.</strong>
+              </div>
+              <p style="color: #666; font-size: 14px;">Zeitpunkt der Benachrichtigung: ${now}</p>
+            </div>
+            <div style="background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999;">
+              Diese Nachricht wurde automatisch von <strong>CheckMe</strong> gesendet.
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+            text: `CheckMe Alert: Die überwachte Person hat sich nicht innerhalb des erwarteten Zeitfensters eingecheckt. Bitte prüfe ihr Wohlbefinden. Zeitpunkt: ${now}`,
+        });
+        const messageId = (_d = (_c = result === null || result === void 0 ? void 0 : result.data) === null || _c === void 0 ? void 0 : _c.id) !== null && _d !== void 0 ? _d : null;
+        await logRef.update({
+            status: "sent",
+            sentAt: admin.firestore.Timestamp.now(),
+            resendMessageId: messageId,
+        });
+        functions.logger.info("Notification emails sent", { userId, recipients: recipientEmails, messageId });
+    }
+    catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        await logRef.update({
+            status: "failed",
+            error: errorMessage,
+        });
+        functions.logger.error("Failed to send notification email", { userId, error: errorMessage });
+        // Re-throw so the Cloud Function is marked as failed and the trigger doc is NOT deleted
+        throw err;
+    }
+}
+//# sourceMappingURL=index.js.map

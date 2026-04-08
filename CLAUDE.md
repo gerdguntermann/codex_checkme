@@ -1,0 +1,276 @@
+# CLAUDE.md – CheckMe
+
+Dieses Dokument ist die primäre Kontextquelle für Claude Code beim Arbeiten an diesem Projekt.
+Lies es vollständig bevor du Änderungen vornimmst.
+
+---
+
+## Projektüberblick
+
+**CheckMe** ist eine Flutter-App zur Gesundheitsüberwachung via regelmäßiger Check-ins.
+
+- Der Nutzer drückt regelmäßig einen Button um zu bestätigen, dass es ihm gut geht
+- Bei Ausbleiben eines Check-ins werden Notfallkontakte per E-Mail benachrichtigt
+- Zwei Timing-Modi: **feste Uhrzeit** (täglich, z. B. 09:00) oder **Intervall** (z. B. alle 4 h)
+- Nach Ablauf der Deadline beginnt eine konfigurierbare **Karenzzeit** (Grace Period)
+- Alle Parameter sind konfigurierbar; Benachrichtigungen laufen über Firebase Cloud Functions
+
+**Package:** `de.mydigits.checkme`
+**Plattform:** Android (primär), Flutter Cross-Platform vorbereitet
+
+---
+
+## Tech-Stack
+
+| Bereich            | Technologie                                                  |
+|--------------------|--------------------------------------------------------------|
+| Framework          | Flutter / Dart ≥ 3.10                                        |
+| State Management   | Riverpod 2.x (`AsyncNotifier`, `flutter_riverpod`)           |
+| Navigation         | GoRouter                                                     |
+| Backend            | Firebase (Firestore, Auth Anonymous, Cloud Functions)        |
+| E-Mail             | Resend API via Firebase Cloud Functions (Node.js/TypeScript) |
+| Hintergrund        | Workmanager (Android, 15-Minuten-Task)                       |
+| Local Storage      | SharedPreferences (Config-Cache/Fallback)                    |
+| Serialisierung     | json_serializable + build_runner                             |
+| Logging            | AppLogger (dart:developer + tägliches Logfile)               |
+
+---
+
+## Architektur
+
+Das Projekt verwendet eine **vereinfachte Schichtenarchitektur** (kein vollständiges Clean Architecture):
+
+```
+presentation  →  data  →  Firebase / SharedPreferences
+     ↓
+  domain (Entities, reine Dart-Klassen)
+```
+
+**Schichten:**
+
+| Schicht        | Inhalt                                                          |
+|----------------|-----------------------------------------------------------------|
+| `domain`       | Entities (`CheckInConfig`, `CheckInRecord`, `Contact`) + `TimeUtils` + `CheckInState` |
+| `data`         | Services (`CheckInService`, `ConfigService`, `ContactService`) + Models |
+| `presentation` | Riverpod Providers + Pages/Widgets                              |
+| `background`   | Workmanager-Task (läuft in separatem Isolate)                   |
+| `core`         | Konstanten, Router, Theme, Logger, Utils                        |
+
+**Regeln:**
+- Der `domain`-Layer hat **keine** Flutter- oder Firebase-Abhängigkeiten
+- Services (data-Layer) kapseln alle Firestore-Zugriffe
+- Provider rufen Services direkt auf (kein UseCase-Layer)
+- DI über Riverpod `Provider<T>` in `service_providers.dart` (kein GetIt)
+- Keine hartcodierten Strings – `AppConstants` oder `FirestoreConstants` verwenden
+
+---
+
+## Projektstruktur
+
+```
+checkme_flutter/
+├── lib/
+│   ├── main.dart                          # App-Einstiegspunkt, Firebase-Init, AppLogger-Init
+│   ├── firebase_options.dart              # Firebase-Konfiguration (nicht committen!)
+│   │
+│   ├── core/
+│   │   ├── constants/
+│   │   │   ├── app_constants.dart         # AppConstants (appName, taskName, userIdKey)
+│   │   │   └── firestore_constants.dart   # Collection-/Doc-Namen
+│   │   ├── router/
+│   │   │   └── app_router.dart            # GoRouter: /, /config, /contacts
+│   │   ├── theme/
+│   │   │   └── app_theme.dart             # Material3-Theme (light/dark)
+│   │   └── utils/
+│   │       ├── time_utils.dart            # CheckInState, isOverdue, nextDeadline, getState
+│   │       └── app_logger.dart            # log()-Wrapper: Konsole + tägliches Logfile
+│   │
+│   ├── domain/                            # Kein Flutter, kein Firebase hier!
+│   │   └── entities/
+│   │       ├── check_in_config.dart       # CheckInConfig + TimingMode enum
+│   │       ├── check_in_record.dart
+│   │       └── contact.dart
+│   │
+│   ├── data/
+│   │   ├── models/                        # + .g.dart (generiert, möglichst nicht manuell)
+│   │   │   ├── check_in_config_model.dart
+│   │   │   ├── check_in_record_model.dart
+│   │   │   └── contact_model.dart
+│   │   ├── check_in_service.dart          # Firestore: Check-ins lesen/schreiben
+│   │   ├── config_service.dart            # Firestore + SharedPreferences: Config
+│   │   └── contact_service.dart           # Firestore: Kontakte CRUD
+│   │
+│   ├── presentation/
+│   │   ├── providers/
+│   │   │   ├── auth_provider.dart         # Firebase Anonymous Auth
+│   │   │   ├── service_providers.dart     # Riverpod DI für Services
+│   │   │   ├── check_in_provider.dart     # CheckInNotifier
+│   │   │   ├── config_provider.dart       # ConfigNotifier
+│   │   │   └── contact_provider.dart      # ContactsNotifier
+│   │   └── pages/
+│   │       ├── home/                      # Check-in Button + StatusIndicator
+│   │       ├── config/                    # Einstellungen (Modus, Intervall, Karenzzeit)
+│   │       └── contacts/                  # Notfallkontakte verwalten
+│   │
+│   └── background/
+│       └── background_service.dart        # Workmanager-Task (alle 15 min, Android)
+│
+├── functions/                             # Firebase Cloud Functions
+│   └── src/index.ts                       # E-Mail via Resend + onOverdueTrigger
+│
+├── test/
+│   ├── unit/                              # Reine Dart-Unit-Tests
+│   ├── services/                          # Service-Tests mit fake_cloud_firestore
+│   └── widget/                            # Widget-Tests mit gemockten Providern
+│
+├── integration_test/
+│   └── app_flow_test.dart                 # UI-Flows mit gemockten Providern
+│
+├── firestore.rules
+└── firebase.json
+```
+
+---
+
+## Konfigurationsparameter (`CheckInConfig`)
+
+| Parameter             | Typ          | Default        | Beschreibung                                 |
+|-----------------------|--------------|----------------|----------------------------------------------|
+| `timingMode`          | `TimingMode` | `fixedTime`    | `fixedTime` oder `interval`                  |
+| `checkInHour`         | int          | 9              | Stunde der täglichen Deadline (fixedTime)    |
+| `checkInMinute`       | int          | 0              | Minute der täglichen Deadline (fixedTime)    |
+| `intervalMinutes`     | int          | 240            | Intervall in Minuten (5–1440, interval-Modus)|
+| `gracePeriodMinutes`  | int          | 30             | Karenzzeit nach Deadline                     |
+| `maxNotifications`    | int          | 3              | Max. E-Mails pro Tag                         |
+| `isActive`            | bool         | true           | Überwachung ein/aus                          |
+
+**Timing-Modi:**
+- `fixedTime`: Deadline täglich zur konfigurierten Uhrzeit; Grace Period danach
+- `interval`: Deadline = letzter Check-in + intervalMinutes; nach jedem Check-in neu gestartet
+
+**CheckInState** (`core/utils/time_utils.dart`):
+- `ok` – vor der Deadline (grünes Icon)
+- `grace` – nach Deadline, innerhalb Karenzzeit (oranges Icon)
+- `overdue` – nach Deadline + Karenzzeit (rotes Icon)
+
+Config-Persistenz: Firestore (primär) + SharedPreferences (Cache/Fallback)
+
+---
+
+## Firestore-Struktur
+
+```
+users/{uid}/
+├── check_ins/{id}            # timestamp, userId, id
+├── config/user_config        # CheckInConfig-Felder (single document)
+├── contacts/{id}             # name, email, phone?
+└── notification_logs/{id}    # sentAt, recipientEmails (geschrieben von Cloud Function)
+
+overdue_triggers/{id}         # userId, triggeredAt → löst Cloud Function aus
+users/{uid}/background_logs/  # Protokoll jedes Workmanager-Laufs
+```
+
+**Hintergrund-Flow (Android):**
+1. Workmanager-Task läuft alle 15 min
+2. Prüft `TimeUtils.isOverdue(lastCheckIn, config)`
+3. Bei Überfälligkeit → schreibt Dokument in `overdue_triggers`
+4. Cloud Function `onOverdueTrigger` reagiert → sendet E-Mails via Resend → löscht Trigger-Dok.
+
+---
+
+## Logging
+
+Alle `log()`-Aufrufe verwenden `package:checkme/core/utils/app_logger.dart` (nicht `dart:developer` direkt).
+
+- Debug-Konsole: immer
+- Datei: `checkme_YYYY-MM-DD.log` im App-Dokumentenverzeichnis
+  - Android: `/data/user/0/de.mydigits.checkme/app_flutter/`
+  - Windows: `C:\Users\<user>\Documents\`
+- `AppLogger.initialize()` wird in `main()` vor dem ersten `log()`-Aufruf aufgerufen
+
+---
+
+## Tests
+
+```bash
+flutter test test/                  # alle Unit- und Widget-Tests (84 Tests)
+flutter test integration_test/      # UI-Integrationstests (Gerät/Emulator nötig)
+```
+
+Test-Strategie:
+- **Unit**: `TimeUtils`, Entities, Models – keine externen Abhängigkeiten
+- **Services**: `fake_cloud_firestore` + `SharedPreferences.setMockInitialValues`
+- **Widget**: Riverpod-Provider überschreiben (Fake-Notifier muss konkreten Notifier-Typ erweitern)
+- **Integration**: alle Provider gemockt, kein Firebase nötig
+
+---
+
+## Build & Setup
+
+### Flutter-App starten
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter run
+```
+
+### Nach Model-Änderungen (json_serializable)
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
+`.g.dart`-Dateien möglichst nicht manuell bearbeiten. Falls doch nötig (Backward-Compat-Defaults),
+`@JsonKey(defaultValue: ...)` in der Model-Klasse setzen und dann build_runner laufen lassen.
+
+### Firebase einrichten (einmalig)
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure --project=DEIN_FIREBASE_PROJECT_ID
+# Generiert lib/firebase_options.dart – nicht in Git committen!
+```
+
+### Cloud Functions deployen
+```bash
+cd functions && npm install
+# Resend API Key in functions/.env setzen:
+echo "RESEND_API_KEY=re_..." > functions/.env
+firebase deploy --only functions
+```
+
+---
+
+## Coding-Regeln für Claude Code
+
+### Was du tun sollst
+- **Imports:** `package:checkme/core/utils/app_logger.dart` statt `dart:developer`
+- **Neue Config-Parameter:** in `CheckInConfig` + `CheckInConfigModel` + `.g.dart` (oder build_runner)
+- **Neue Firestore-Collections:** Konstante in `FirestoreConstants` anlegen
+- **Neue Strings:** in `AppConstants` anlegen
+- **Tests:** für neue Services `fake_cloud_firestore` verwenden; für neue Notifier den konkreten Notifier-Typ in Fake-Klassen erweitern
+
+### Was du nicht tun sollst
+- Keine direkten Firebase-Aufrufe aus `domain/`-Dateien
+- Keine Flutter-Imports in `domain/entities/`
+- Keine neuen State-Management-Lösungen (nur Riverpod 2.x)
+- Kein `dart:developer` direkt importieren – immer `app_logger.dart`
+- `firebase_options.dart` nicht committen
+
+---
+
+## Bekannte Entscheidungen & Constraints
+
+- **Anonymous Auth:** Nutzer sind anonym authentifiziert – kein Login-Flow geplant
+- **Android-first:** Workmanager läuft nur auf Android; iOS-Hintergrund-Checks nicht implementiert
+- **E-Mail via Resend:** Push-Notifications sind bewusst nicht Teil von v1
+- **Vereinfachte Architektur:** UseCase-Layer, Repository-Interfaces und GetIt wurden zugunsten
+  direkter Service-Aufrufe aus Providern entfernt. Bei Bedarf können sie wieder eingeführt werden.
+- **`firebase_options.dart`** wird lokal generiert und **nicht** ins Repository committed
+
+---
+
+## Routen
+
+| Route       | Seite        |
+|-------------|--------------|
+| `/`         | HomePage     |
+| `/config`   | ConfigPage   |
+| `/contacts` | ContactsPage |

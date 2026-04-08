@@ -1,0 +1,89 @@
+{
+  "@@locale": "de",
+
+  "appTitle": "My Daily OK",
+  "tooltipContacts": "Kontakte",
+  "tooltipSettings": "Einstellungen",
+  "authError": "Auth-Fehler: {error}",
+  "@authError": {
+    "placeholders": {
+      "error": {"type": "Object"}
+    }
+  },
+  "tapToConfirm": "Tippe um zu bestätigen, dass es dir gut geht",
+
+  "checkInButton": "Ich bin OK",
+
+  "genericError": "Fehler: {error}",
+  "@genericError": {
+    "placeholders": {
+      "error": {"type": "Object"}
+    }
+  },
+  "noCheckInsYet": "Noch keine Check-ins",
+  "pressButtonToStart": "Drücke den Button um zu starten",
+  "statusOverdue": "ÜBERFÄLLIG",
+  "statusGrace": "KARENZZEIT",
+  "statusOk": "OK",
+  "statusWindowOpen": "FENSTER OFFEN",
+  "checkInRequired": "Check-in erforderlich!",
+  "overdueSinceLabel": "Überfällig seit",
+  "graceMessage": "Check-in bald erforderlich",
+  "allGood": "Alles gut",
+  "windowOpenMessage": "Check-in Fenster offen",
+  "checkInWindowStartLabel": "Check-in ab",
+  "checkInAvailableFrom": "Verfügbar ab {time}",
+  "@checkInAvailableFrom": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "lastCheckIn": "Letzter Check-in",
+  "nextDeadline": "Nächster Check-in",
+  "tomorrow": "morgen",
+
+  "settingsTitle": "Einstellungen",
+  "timingModeLabel": "Modus",
+  "timingModeFixedTime": "Feste Uhrzeit",
+  "timingModeInterval": "Intervall",
+  "dailyCheckInTime": "Tägliche Check-in Zeit",
+  "timeUnitSuffix": " Uhr",
+  "checkInIntervalLabel": "Check-in Intervall",
+  "hourUnit": "h",
+  "gracePeriodLabel": "Karenzzeit nach Check-in",
+  "preDeadlineLabel": "Check-in Fenster vor Check-in",
+  "minuteUnit": "min",
+  "maxNotificationsLabel": "Max. Benachrichtigungen / Tag",
+  "settingsSaved": "Einstellungen gespeichert",
+  "monitoringActive": "Monitoring aktiv",
+  "monitoringSubtitle": "Alle Benachrichtigungen ein-/ausschalten",
+
+  "windowStartLabel": "Fenster öffnet",
+  "windowEndLabel": "Fenster schließt",
+  "addWindow": "Zweites Zeitfenster hinzufügen",
+  "windowEndsAtLabel": "Fenster endet",
+  "nextWindowLabel": "Nächstes Fenster",
+
+  "contactsTitle": "Kontakte",
+  "noContactsYet": "Noch keine Kontakte",
+  "tapToAddContact": "Tippe + um einen Kontakt hinzuzufügen",
+  "addContact": "Kontakt hinzufügen",
+  "editContact": "Kontakt bearbeiten",
+  "fieldName": "Name",
+  "fieldEmail": "E-Mail",
+  "fieldPhone": "Telefon (optional)",
+  "phoneHint": "+49123456789",
+  "nameRequired": "Name erforderlich",
+  "emailRequired": "E-Mail erforderlich",
+  "invalidEmail": "Ungültige E-Mail-Adresse",
+  "cancel": "Abbrechen",
+  "save": "Speichern",
+  "deleteContact": "Kontakt löschen",
+  "deleteContactConfirm": "{name} löschen?",
+  "@deleteContactConfirm": {
+    "placeholders": {
+      "name": {"type": "Object"}
+    }
+  },
+  "delete": "Löschen"
+}
